@@ -1,0 +1,26 @@
+/* 自定义样式 */
+body {
+  line-height: 1.7;
+}
+
+header {
+  background-image: linear-gradient(to right, #2563eb, #3b82f6);
+}
+
+#registerBtn {
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.4);
+}
+
+@media (max-width: 640px) {
+  h1 {
+    font-size: 2rem;
+  }
+  section {
+    padding: 0 1rem;
+  }
+}
+
+/* 卡片悬停动画增强 */
+.card-container:hover {
+  transform: translateY(-5px);
+}

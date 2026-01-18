@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package ai;
+
+option go_package = "ai";
+
+message AiReq {
+  string project_id = 2;
+  repeated historyItem history = 1;
+}
+message historyItem {
+  string question = 1;
+  string role = 2;
+}
+
+message AiResp {
+  string answer = 1;
+}
+
+service AiService {
+  rpc Chat(AiReq) returns (stream AiResp);
+}

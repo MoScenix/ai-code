@@ -1,0 +1,231 @@
+syntax = "proto3";
+
+package bff.app;
+
+option go_package = "bff/app";
+
+import "api.proto";
+import "bff/common.proto";
+
+// =====================
+// Service
+// =====================
+service AppService {
+
+  // POST /app/add
+  rpc AddApp(AppAddRequest) returns (BaseResponseLong) {
+    option (api.post) = "/app/add";
+  }
+
+  // POST /app/delete
+  rpc DeleteApp(DeleteRequest) returns (BaseResponseBoolean) {
+    option (api.post) = "/app/delete";
+  }
+
+  // POST /app/update
+  rpc UpdateApp(AppUpdateRequest) returns (BaseResponseBoolean) {
+    option (api.post) = "/app/update";
+  }
+
+  // GET /app/get/vo?id=xxx
+  rpc GetAppVOById(GetAppVOByIdRequest) returns (BaseResponseAppVO) {
+    option (api.get) = "/app/get/vo";
+  }
+
+  // POST /app/my/list/page/vo
+  rpc ListMyAppVOByPage(AppQueryRequest) returns (BaseResponsePageAppVO) {
+    option (api.post) = "/app/my/list/page/vo";
+  }
+
+  // POST /app/good/list/page/vo
+  rpc ListGoodAppVOByPage(AppQueryRequest) returns (BaseResponsePageAppVO) {
+    option (api.post) = "/app/good/list/page/vo";
+  }
+
+  // POST /app/deploy
+  rpc DeployApp(AppDeployRequest) returns (BaseResponseString) {
+    option (api.post) = "/app/deploy";
+  }
+
+  // GET /app/download/{appId}
+  rpc DownloadAppCode(DownloadAppCodeRequest) returns (BaseResponseBytes) {
+    option (api.get) = "/app/download/{appId}";
+  }
+
+  // GET /app/chat/gen/code?appId=xxx&message=yyy
+  rpc ChatToGenCode(ChatToGenCodeRequest) returns (ServerSentEventStringList) {
+    option (api.get) = "/app/chat/gen/code";
+  }
+
+  // ===== Admin =====
+
+  // POST /app/admin/delete
+  rpc DeleteAppByAdmin(DeleteRequest) returns (BaseResponseBoolean) {
+    option (api.post) = "/app/admin/delete";
+  }
+
+  // POST /app/admin/update
+  rpc UpdateAppByAdmin(AppAdminUpdateRequest) returns (BaseResponseBoolean) {
+    option (api.post) = "/app/admin/update";
+  }
+
+  // GET /app/admin/get/vo?id=xxx
+  rpc GetAppVOByIdByAdmin(GetAppVOByIdByAdminRequest) returns (BaseResponseAppVO) {
+    option (api.get) = "/app/admin/get/vo";
+  }
+
+  // POST /app/admin/list/page/vo
+  rpc ListAppVOByPageByAdmin(AppQueryRequest) returns (BaseResponsePageAppVO) {
+    option (api.post) = "/app/admin/list/page/vo";
+  }
+}
+
+// =====================
+// Common response wrappers
+// =====================
+message BaseResponseBoolean {
+  int32 code = 1;
+  bool data = 2;
+  string message = 3;
+}
+
+message BaseResponseLong {
+  int32 code = 1;
+  int64 data = 2;
+  string message = 3;
+}
+
+message BaseResponseString {
+  int32 code = 1;
+  string data = 2;
+  string message = 3;
+}
+
+message BaseResponseAppVO {
+  int32 code = 1;
+  AppVO data = 2;
+  string message = 3;
+}
+
+message BaseResponsePageAppVO {
+  int32 code = 1;
+  PageAppVO data = 2;
+  string message = 3;
+}
+
+// 下载场景一般是 bytes/blob（你 TS 里是 any，这里给一个 bytes 包装）
+message BaseResponseBytes {
+  int32 code = 1;
+  bytes data = 2;
+  string message = 3;
+}
+
+// 你 TS 里写的是 ServerSentEventString[]，这里给一个列表包装。
+//（如果你们网关/框架对 SSE 有更标准的定义，可以替换掉）
+message ServerSentEventStringList {
+  repeated string data = 1;
+}
+
+// =====================
+// Requests
+// =====================
+message DeleteRequest {
+  int64 id = 1;
+}
+
+message AppAddRequest {
+  string initPrompt = 1;
+}
+
+message AppUpdateRequest {
+  int64 id = 1;
+  string appName = 2;
+}
+
+message AppAdminUpdateRequest {
+  int64 id = 1;
+  string appName = 2;
+  string cover = 3;
+  int64 priority = 4;
+}
+
+message AppDeployRequest {
+  int64 appId = 1;
+}
+
+message GetAppVOByIdRequest {
+  int64 id = 1 [(api.query) = "id"];
+}
+
+message GetAppVOByIdByAdminRequest {
+  int64 id = 1 [(api.query) = "id"];
+}
+
+message ChatToGenCodeRequest {
+  int64 appId = 1 [(api.query) = "appId"];
+  string message = 2 [(api.query) = "message"];
+}
+
+message DownloadAppCodeRequest {
+  int64 appId = 1 [(api.path) = "appId"];
+}
+
+// TS 里 AppQueryRequest 字段很多，这里原样映射
+message AppQueryRequest {
+  int64 pageNum = 1;
+  int64 pageSize = 2;
+  string sortField = 3;
+  string sortOrder = 4;
+
+  int64 id = 5;
+  string appName = 6;
+  string cover = 7;
+  string initPrompt = 8;
+  string codeGenType = 9;
+  string deployKey = 10;
+  int64 priority = 11;
+  int64 userId = 12;
+}
+
+// =====================
+// Entities / VOs
+// =====================
+message AppVO {
+  int64 id = 1;
+  string appName = 2;
+  string cover = 3;
+  string initPrompt = 4;
+  string codeGenType = 5;
+  string deployKey = 6;
+  string deployedTime = 7;
+  int64 priority = 8;
+  int64 userId = 9;
+
+  string createTime = 10;
+  string updateTime = 11;
+
+  UserVO user = 12;
+}
+
+// 你 TS 里 AppVO.user 用的是 UserVO（沿用你 User 的 VO 结构）
+message UserVO {
+  int64 id = 1;
+  string userAccount = 2;
+  string userName = 3;
+  string userAvatar = 4;
+  string userProfile = 5;
+  string userRole = 6;
+  string createTime = 7;
+}
+
+// =====================
+// Pagination
+// =====================
+message PageAppVO {
+  repeated AppVO records = 1;
+  int64 pageNumber = 2;
+  int64 pageSize = 3;
+  int64 totalPage = 4;
+  int64 totalRow = 5;
+  bool optimizeCountQuery = 6;
+}

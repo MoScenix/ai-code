@@ -1,0 +1,57 @@
+package service
+
+import (
+	"context"
+	"fmt"
+
+	"github.com/MoScenix/ai-code/app/bff/biz/utils"
+	user "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/user"
+	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
+	rpcuser "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
+	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/google/uuid"
+)
+
+type UpdateUserService struct {
+	RequestContext *app.RequestContext
+	Context        context.Context
+}
+
+func NewUpdateUserService(Context context.Context, RequestContext *app.RequestContext) *UpdateUserService {
+	return &UpdateUserService{RequestContext: RequestContext, Context: Context}
+}
+
+func (h *UpdateUserService) Run(req *user.UserUpdateRequest) (resp *user.BaseResponseBoolean, err error) {
+	if int64(h.Context.Value(utils.UserIdKey).(float64)) != req.Id {
+		return &user.BaseResponseBoolean{
+			Code:    2,
+			Message: "用户id不一致",
+			Data:    false,
+		}, nil
+	}
+	avatar, err := h.RequestContext.FormFile("avatar")
+	if avatar != nil && err == nil {
+		req.UserAvatar = "/share/avatar/" + uuid.New().String() + ".jpg"
+		h.RequestContext.SaveUploadedFile(avatar, req.UserAvatar)
+	}
+	fmt.Println(req)
+	_, err = rpc.UserClient.Update(h.Context, &rpcuser.UpdateReq{
+		Id:          req.Id,
+		UserName:    req.UserName,
+		UserAvatar:  req.UserAvatar,
+		UserProfile: req.UserProfile,
+		UserRole:    req.UserRole,
+	})
+	if err != nil {
+		return &user.BaseResponseBoolean{
+			Code:    1,
+			Message: "更新用户信息失败",
+			Data:    false,
+		}, err
+	}
+	return &user.BaseResponseBoolean{
+		Code:    0,
+		Message: "success",
+		Data:    true,
+	}, err
+}

@@ -1,0 +1,11 @@
+FROM node:20-alpine AS builder
+WORKDIR /work
+RUN npm config set registry https://registry.npmmirror.com
+COPY app/frontend/package*.json ./app/frontend/
+RUN cd app/frontend && npm ci
+COPY app/frontend ./app/frontend
+RUN cd app/frontend && npm run build
+FROM nginx:1.27-alpine
+COPY --from=builder /work/app/frontend/dist /usr/share/nginx/html
+COPY app/frontend/nginx.conf /etc/nginx/conf.d/default.conf
+EXPOSE 80

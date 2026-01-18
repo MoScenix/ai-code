@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+package app;
+
+option go_package = "app";
+
+message AppInfo {
+  int64  id           = 1;
+  string appName      = 2;
+  string cover        = 3;
+  string initPrompt   = 4;
+  string deployKey    = 6;
+  string deployedTime = 7;
+  int64  priority     = 8;
+  int64  userId       = 9;
+  string createTime   = 10;
+  string updateTime   = 11;
+}
+message AddAppReq {
+  string initPrompt = 1;
+}
+
+message AddAppResp {
+  int64 id = 1;
+}
+message DeleteAppReq {
+  int64 id = 1;
+}
+
+message DeleteAppResp {
+  bool success = 1;
+}
+message UpdateAppReq {
+  int64  id       = 1;
+  string appName  = 2;
+  string cover    = 3;
+  int64  priority = 4;
+}
+
+message UpdateAppResp {
+  bool success = 1;
+}
+message GetAppReq {
+  int64 id = 1;
+}
+
+message GetAppResp {
+  AppInfo app = 1;
+}
+message ListAppReq {
+  int64 pageNum  = 1;
+  int64 pageSize = 2;
+  string appName = 3;
+  int64 userId = 4;
+}
+message ListAppResp {
+  repeated AppInfo appList = 1;
+  int64 total = 2;
+}
+service AppService {
+  rpc AddApp(AddAppReq) returns (AddAppResp);
+  rpc DeleteApp(DeleteAppReq) returns (DeleteAppResp);
+  rpc UpdateApp(UpdateAppReq) returns (UpdateAppResp);
+  rpc GetApp(GetAppReq) returns (GetAppResp);
+  rpc ListApp(ListAppReq) returns (ListAppResp);
+}
