@@ -31,7 +31,10 @@ func InitMetric(serviceName, MetricPort, registerAddr string) {
 			"service": serviceName,
 		},
 	}
-	r.Register(registerInfo)
+	err = r.Register(registerInfo)
+	if err != nil {
+		panic(err)
+	}
 	server.RegisterShutdownHook(func() {
 		r.Deregister(registerInfo)
 	})
