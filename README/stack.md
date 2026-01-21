@@ -1,4 +1,5 @@
-
+# 架构
+具体细节可以参考[https://deepwiki.com/MoScenix/ai-code/1-overview](https://deepwiki.com/MoScenix/ai-code/1-overview)的分析
 #  技术栈
 
 | 技术 | 说明 |
