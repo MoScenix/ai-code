@@ -51,3 +51,30 @@ func ListApp(ctx context.Context, req *app.ListAppReq, callOptions ...callopt.Op
 	}
 	return resp, nil
 }
+
+func AddMessage(ctx context.Context, req *app.AddMessageReq, callOptions ...callopt.Option) (resp *app.AddMessageResp, err error) {
+	resp, err = defaultClient.AddMessage(ctx, req, callOptions...)
+	if err != nil {
+		klog.CtxErrorf(ctx, "AddMessage call failed,err =%+v", err)
+		return nil, err
+	}
+	return resp, nil
+}
+
+func DeleteMessage(ctx context.Context, req *app.DeleteMessageReq, callOptions ...callopt.Option) (resp *app.DeleteMessageResp, err error) {
+	resp, err = defaultClient.DeleteMessage(ctx, req, callOptions...)
+	if err != nil {
+		klog.CtxErrorf(ctx, "DeleteMessage call failed,err =%+v", err)
+		return nil, err
+	}
+	return resp, nil
+}
+
+func ListAppMessage(ctx context.Context, req *app.ListAppMessageReq, callOptions ...callopt.Option) (resp *app.ListAppMessageResp, err error) {
+	resp, err = defaultClient.ListAppMessage(ctx, req, callOptions...)
+	if err != nil {
+		klog.CtxErrorf(ctx, "ListAppMessage call failed,err =%+v", err)
+		return nil, err
+	}
+	return resp, nil
+}

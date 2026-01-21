@@ -196,7 +196,7 @@ const editApp = (app: API.AppVO) => {
 const toggleFeatured = async (app: API.AppVO) => {
   if (!app.id) return
 
-  const newPriority = app.priority === 99 ? 0 : 99
+  const newPriority = app.priority === 99 ? 1 : 99
 
   try {
     const res = await updateAppByAdmin({

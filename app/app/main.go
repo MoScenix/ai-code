@@ -4,19 +4,26 @@ import (
 	"net"
 	"time"
 
+	"github.com/MoScenix/ai-code/app/app/biz/dal"
+	"github.com/MoScenix/ai-code/app/app/conf"
+	"github.com/MoScenix/ai-code/common/mtl"
+	"github.com/MoScenix/ai-code/common/serversuit"
+	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app/appservice"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/server"
+	"github.com/joho/godotenv"
 	kitexlogrus "github.com/kitex-contrib/obs-opentelemetry/logging/logrus"
-	"github.com/MoScenix/ai-code/app/app/conf"
-	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app/appservice"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
 
 func main() {
+	godotenv.Load()
+	mtl.InitMetric(conf.GetConf().Kitex.Service, conf.GetConf().Kitex.MetricsPort, conf.GetConf().Registry.RegistryAddress[0])
 	opts := kitexInit()
 
+	dal.Init()
 	svr := appservice.NewServer(new(AppServiceImpl), opts...)
 
 	err := svr.Run()
@@ -37,7 +44,10 @@ func kitexInit() (opts []server.Option) {
 	opts = append(opts, server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
 		ServiceName: conf.GetConf().Kitex.Service,
 	}))
-
+	opts = append(opts, server.WithSuite(&serversuit.CommonServerSuilt{
+		ServerName:   conf.GetConf().Kitex.Service,
+		RegistryAddr: conf.GetConf().Registry.RegistryAddress[0],
+	}))
 	// klog
 	logger := kitexlogrus.NewLogger()
 	klog.SetLogger(logger)

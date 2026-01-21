@@ -19,11 +19,6 @@ func NewAddUserService(Context context.Context, RequestContext *app.RequestConte
 }
 
 func (h *AddUserService) Run(req *user.UserAddRequest) (resp *user.BaseResponseLong, err error) {
-	//defer func() {
-	// hlog.CtxInfof(h.Context, "req = %+v", req)
-	// hlog.CtxInfof(h.Context, "resp = %+v", resp)
-	//}()
-	// todo edit your code
 	_, err = rpc.UserClient.AddUser(h.Context, &rpcuser.AddUserReq{
 		UserAccount:  req.UserAccount,
 		UserAvatar:   req.UserAvatar,

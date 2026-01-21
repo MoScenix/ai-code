@@ -4,6 +4,8 @@ import (
 	"context"
 
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
+	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
+	rpcapp "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 	"github.com/cloudwego/hertz/pkg/app"
 )
 
@@ -17,10 +19,22 @@ func NewUpdateAppByAdminService(Context context.Context, RequestContext *app.Req
 }
 
 func (h *UpdateAppByAdminService) Run(req *lapp.AppAdminUpdateRequest) (resp *lapp.BaseResponseBoolean, err error) {
-	//defer func() {
-	// hlog.CtxInfof(h.Context, "req = %+v", req)
-	// hlog.CtxInfof(h.Context, "resp = %+v", resp)
-	//}()
-	// todo edit your code
+	res, err := rpc.AppClient.UpdateApp(h.Context, &rpcapp.UpdateAppReq{
+		Id:       req.Id,
+		AppName:  req.AppName,
+		Cover:    req.Cover,
+		Priority: req.Priority,
+	})
+	if err != nil {
+		return &lapp.BaseResponseBoolean{
+			Code:    1,
+			Message: err.Error(),
+		}, err
+	}
+	return &lapp.BaseResponseBoolean{
+		Code:    0,
+		Message: "success",
+		Data:    res.Success,
+	}, nil
 	return
 }

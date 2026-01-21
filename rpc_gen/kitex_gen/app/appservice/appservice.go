@@ -50,6 +50,27 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingUnary),
 	),
+	"AddMessage": kitex.NewMethodInfo(
+		addMessageHandler,
+		newAddMessageArgs,
+		newAddMessageResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingUnary),
+	),
+	"DeleteMessage": kitex.NewMethodInfo(
+		deleteMessageHandler,
+		newDeleteMessageArgs,
+		newDeleteMessageResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingUnary),
+	),
+	"ListAppMessage": kitex.NewMethodInfo(
+		listAppMessageHandler,
+		newListAppMessageArgs,
+		newListAppMessageResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingUnary),
+	),
 }
 
 var (
@@ -881,6 +902,465 @@ func (p *ListAppResult) GetResult() interface{} {
 	return p.Success
 }
 
+func addMessageHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	switch s := arg.(type) {
+	case *streaming.Args:
+		st := s.Stream
+		req := new(app.AddMessageReq)
+		if err := st.RecvMsg(req); err != nil {
+			return err
+		}
+		resp, err := handler.(app.AppService).AddMessage(ctx, req)
+		if err != nil {
+			return err
+		}
+		return st.SendMsg(resp)
+	case *AddMessageArgs:
+		success, err := handler.(app.AppService).AddMessage(ctx, s.Req)
+		if err != nil {
+			return err
+		}
+		realResult := result.(*AddMessageResult)
+		realResult.Success = success
+		return nil
+	default:
+		return errInvalidMessageType
+	}
+}
+func newAddMessageArgs() interface{} {
+	return &AddMessageArgs{}
+}
+
+func newAddMessageResult() interface{} {
+	return &AddMessageResult{}
+}
+
+type AddMessageArgs struct {
+	Req *app.AddMessageReq
+}
+
+func (p *AddMessageArgs) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetReq() {
+		p.Req = new(app.AddMessageReq)
+	}
+	return p.Req.FastRead(buf, _type, number)
+}
+
+func (p *AddMessageArgs) FastWrite(buf []byte) (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.FastWrite(buf)
+}
+
+func (p *AddMessageArgs) Size() (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.Size()
+}
+
+func (p *AddMessageArgs) Marshal(out []byte) ([]byte, error) {
+	if !p.IsSetReq() {
+		return out, nil
+	}
+	return proto.Marshal(p.Req)
+}
+
+func (p *AddMessageArgs) Unmarshal(in []byte) error {
+	msg := new(app.AddMessageReq)
+	if err := proto.Unmarshal(in, msg); err != nil {
+		return err
+	}
+	p.Req = msg
+	return nil
+}
+
+var AddMessageArgs_Req_DEFAULT *app.AddMessageReq
+
+func (p *AddMessageArgs) GetReq() *app.AddMessageReq {
+	if !p.IsSetReq() {
+		return AddMessageArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+
+func (p *AddMessageArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *AddMessageArgs) GetFirstArgument() interface{} {
+	return p.Req
+}
+
+type AddMessageResult struct {
+	Success *app.AddMessageResp
+}
+
+var AddMessageResult_Success_DEFAULT *app.AddMessageResp
+
+func (p *AddMessageResult) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetSuccess() {
+		p.Success = new(app.AddMessageResp)
+	}
+	return p.Success.FastRead(buf, _type, number)
+}
+
+func (p *AddMessageResult) FastWrite(buf []byte) (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.FastWrite(buf)
+}
+
+func (p *AddMessageResult) Size() (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.Size()
+}
+
+func (p *AddMessageResult) Marshal(out []byte) ([]byte, error) {
+	if !p.IsSetSuccess() {
+		return out, nil
+	}
+	return proto.Marshal(p.Success)
+}
+
+func (p *AddMessageResult) Unmarshal(in []byte) error {
+	msg := new(app.AddMessageResp)
+	if err := proto.Unmarshal(in, msg); err != nil {
+		return err
+	}
+	p.Success = msg
+	return nil
+}
+
+func (p *AddMessageResult) GetSuccess() *app.AddMessageResp {
+	if !p.IsSetSuccess() {
+		return AddMessageResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+func (p *AddMessageResult) SetSuccess(x interface{}) {
+	p.Success = x.(*app.AddMessageResp)
+}
+
+func (p *AddMessageResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *AddMessageResult) GetResult() interface{} {
+	return p.Success
+}
+
+func deleteMessageHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	switch s := arg.(type) {
+	case *streaming.Args:
+		st := s.Stream
+		req := new(app.DeleteMessageReq)
+		if err := st.RecvMsg(req); err != nil {
+			return err
+		}
+		resp, err := handler.(app.AppService).DeleteMessage(ctx, req)
+		if err != nil {
+			return err
+		}
+		return st.SendMsg(resp)
+	case *DeleteMessageArgs:
+		success, err := handler.(app.AppService).DeleteMessage(ctx, s.Req)
+		if err != nil {
+			return err
+		}
+		realResult := result.(*DeleteMessageResult)
+		realResult.Success = success
+		return nil
+	default:
+		return errInvalidMessageType
+	}
+}
+func newDeleteMessageArgs() interface{} {
+	return &DeleteMessageArgs{}
+}
+
+func newDeleteMessageResult() interface{} {
+	return &DeleteMessageResult{}
+}
+
+type DeleteMessageArgs struct {
+	Req *app.DeleteMessageReq
+}
+
+func (p *DeleteMessageArgs) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetReq() {
+		p.Req = new(app.DeleteMessageReq)
+	}
+	return p.Req.FastRead(buf, _type, number)
+}
+
+func (p *DeleteMessageArgs) FastWrite(buf []byte) (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.FastWrite(buf)
+}
+
+func (p *DeleteMessageArgs) Size() (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.Size()
+}
+
+func (p *DeleteMessageArgs) Marshal(out []byte) ([]byte, error) {
+	if !p.IsSetReq() {
+		return out, nil
+	}
+	return proto.Marshal(p.Req)
+}
+
+func (p *DeleteMessageArgs) Unmarshal(in []byte) error {
+	msg := new(app.DeleteMessageReq)
+	if err := proto.Unmarshal(in, msg); err != nil {
+		return err
+	}
+	p.Req = msg
+	return nil
+}
+
+var DeleteMessageArgs_Req_DEFAULT *app.DeleteMessageReq
+
+func (p *DeleteMessageArgs) GetReq() *app.DeleteMessageReq {
+	if !p.IsSetReq() {
+		return DeleteMessageArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+
+func (p *DeleteMessageArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *DeleteMessageArgs) GetFirstArgument() interface{} {
+	return p.Req
+}
+
+type DeleteMessageResult struct {
+	Success *app.DeleteMessageResp
+}
+
+var DeleteMessageResult_Success_DEFAULT *app.DeleteMessageResp
+
+func (p *DeleteMessageResult) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetSuccess() {
+		p.Success = new(app.DeleteMessageResp)
+	}
+	return p.Success.FastRead(buf, _type, number)
+}
+
+func (p *DeleteMessageResult) FastWrite(buf []byte) (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.FastWrite(buf)
+}
+
+func (p *DeleteMessageResult) Size() (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.Size()
+}
+
+func (p *DeleteMessageResult) Marshal(out []byte) ([]byte, error) {
+	if !p.IsSetSuccess() {
+		return out, nil
+	}
+	return proto.Marshal(p.Success)
+}
+
+func (p *DeleteMessageResult) Unmarshal(in []byte) error {
+	msg := new(app.DeleteMessageResp)
+	if err := proto.Unmarshal(in, msg); err != nil {
+		return err
+	}
+	p.Success = msg
+	return nil
+}
+
+func (p *DeleteMessageResult) GetSuccess() *app.DeleteMessageResp {
+	if !p.IsSetSuccess() {
+		return DeleteMessageResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+func (p *DeleteMessageResult) SetSuccess(x interface{}) {
+	p.Success = x.(*app.DeleteMessageResp)
+}
+
+func (p *DeleteMessageResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *DeleteMessageResult) GetResult() interface{} {
+	return p.Success
+}
+
+func listAppMessageHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	switch s := arg.(type) {
+	case *streaming.Args:
+		st := s.Stream
+		req := new(app.ListAppMessageReq)
+		if err := st.RecvMsg(req); err != nil {
+			return err
+		}
+		resp, err := handler.(app.AppService).ListAppMessage(ctx, req)
+		if err != nil {
+			return err
+		}
+		return st.SendMsg(resp)
+	case *ListAppMessageArgs:
+		success, err := handler.(app.AppService).ListAppMessage(ctx, s.Req)
+		if err != nil {
+			return err
+		}
+		realResult := result.(*ListAppMessageResult)
+		realResult.Success = success
+		return nil
+	default:
+		return errInvalidMessageType
+	}
+}
+func newListAppMessageArgs() interface{} {
+	return &ListAppMessageArgs{}
+}
+
+func newListAppMessageResult() interface{} {
+	return &ListAppMessageResult{}
+}
+
+type ListAppMessageArgs struct {
+	Req *app.ListAppMessageReq
+}
+
+func (p *ListAppMessageArgs) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetReq() {
+		p.Req = new(app.ListAppMessageReq)
+	}
+	return p.Req.FastRead(buf, _type, number)
+}
+
+func (p *ListAppMessageArgs) FastWrite(buf []byte) (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.FastWrite(buf)
+}
+
+func (p *ListAppMessageArgs) Size() (n int) {
+	if !p.IsSetReq() {
+		return 0
+	}
+	return p.Req.Size()
+}
+
+func (p *ListAppMessageArgs) Marshal(out []byte) ([]byte, error) {
+	if !p.IsSetReq() {
+		return out, nil
+	}
+	return proto.Marshal(p.Req)
+}
+
+func (p *ListAppMessageArgs) Unmarshal(in []byte) error {
+	msg := new(app.ListAppMessageReq)
+	if err := proto.Unmarshal(in, msg); err != nil {
+		return err
+	}
+	p.Req = msg
+	return nil
+}
+
+var ListAppMessageArgs_Req_DEFAULT *app.ListAppMessageReq
+
+func (p *ListAppMessageArgs) GetReq() *app.ListAppMessageReq {
+	if !p.IsSetReq() {
+		return ListAppMessageArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+
+func (p *ListAppMessageArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *ListAppMessageArgs) GetFirstArgument() interface{} {
+	return p.Req
+}
+
+type ListAppMessageResult struct {
+	Success *app.ListAppMessageResp
+}
+
+var ListAppMessageResult_Success_DEFAULT *app.ListAppMessageResp
+
+func (p *ListAppMessageResult) FastRead(buf []byte, _type int8, number int32) (n int, err error) {
+	if !p.IsSetSuccess() {
+		p.Success = new(app.ListAppMessageResp)
+	}
+	return p.Success.FastRead(buf, _type, number)
+}
+
+func (p *ListAppMessageResult) FastWrite(buf []byte) (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.FastWrite(buf)
+}
+
+func (p *ListAppMessageResult) Size() (n int) {
+	if !p.IsSetSuccess() {
+		return 0
+	}
+	return p.Success.Size()
+}
+
+func (p *ListAppMessageResult) Marshal(out []byte) ([]byte, error) {
+	if !p.IsSetSuccess() {
+		return out, nil
+	}
+	return proto.Marshal(p.Success)
+}
+
+func (p *ListAppMessageResult) Unmarshal(in []byte) error {
+	msg := new(app.ListAppMessageResp)
+	if err := proto.Unmarshal(in, msg); err != nil {
+		return err
+	}
+	p.Success = msg
+	return nil
+}
+
+func (p *ListAppMessageResult) GetSuccess() *app.ListAppMessageResp {
+	if !p.IsSetSuccess() {
+		return ListAppMessageResult_Success_DEFAULT
+	}
+	return p.Success
+}
+
+func (p *ListAppMessageResult) SetSuccess(x interface{}) {
+	p.Success = x.(*app.ListAppMessageResp)
+}
+
+func (p *ListAppMessageResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *ListAppMessageResult) GetResult() interface{} {
+	return p.Success
+}
+
 type kClient struct {
 	c client.Client
 }
@@ -936,6 +1416,36 @@ func (p *kClient) ListApp(ctx context.Context, Req *app.ListAppReq) (r *app.List
 	_args.Req = Req
 	var _result ListAppResult
 	if err = p.c.Call(ctx, "ListApp", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) AddMessage(ctx context.Context, Req *app.AddMessageReq) (r *app.AddMessageResp, err error) {
+	var _args AddMessageArgs
+	_args.Req = Req
+	var _result AddMessageResult
+	if err = p.c.Call(ctx, "AddMessage", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) DeleteMessage(ctx context.Context, Req *app.DeleteMessageReq) (r *app.DeleteMessageResp, err error) {
+	var _args DeleteMessageArgs
+	_args.Req = Req
+	var _result DeleteMessageResult
+	if err = p.c.Call(ctx, "DeleteMessage", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) ListAppMessage(ctx context.Context, Req *app.ListAppMessageReq) (r *app.ListAppMessageResp, err error) {
+	var _args ListAppMessageArgs
+	_args.Req = Req
+	var _result ListAppMessageResult
+	if err = p.c.Call(ctx, "ListAppMessage", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

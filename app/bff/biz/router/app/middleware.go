@@ -150,3 +150,38 @@ func _listmyappvobypageMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _chathistoryMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _admin0Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _list2Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _page2Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listallchathistorybypageforadminMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _app0Mw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listappchathistoryMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

@@ -16,6 +16,9 @@ type Client interface {
 	UpdateApp(ctx context.Context, Req *app.UpdateAppReq, callOptions ...callopt.Option) (r *app.UpdateAppResp, err error)
 	GetApp(ctx context.Context, Req *app.GetAppReq, callOptions ...callopt.Option) (r *app.GetAppResp, err error)
 	ListApp(ctx context.Context, Req *app.ListAppReq, callOptions ...callopt.Option) (r *app.ListAppResp, err error)
+	AddMessage(ctx context.Context, Req *app.AddMessageReq, callOptions ...callopt.Option) (r *app.AddMessageResp, err error)
+	DeleteMessage(ctx context.Context, Req *app.DeleteMessageReq, callOptions ...callopt.Option) (r *app.DeleteMessageResp, err error)
+	ListAppMessage(ctx context.Context, Req *app.ListAppMessageReq, callOptions ...callopt.Option) (r *app.ListAppMessageResp, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -70,4 +73,19 @@ func (p *kAppServiceClient) GetApp(ctx context.Context, Req *app.GetAppReq, call
 func (p *kAppServiceClient) ListApp(ctx context.Context, Req *app.ListAppReq, callOptions ...callopt.Option) (r *app.ListAppResp, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.ListApp(ctx, Req)
+}
+
+func (p *kAppServiceClient) AddMessage(ctx context.Context, Req *app.AddMessageReq, callOptions ...callopt.Option) (r *app.AddMessageResp, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.AddMessage(ctx, Req)
+}
+
+func (p *kAppServiceClient) DeleteMessage(ctx context.Context, Req *app.DeleteMessageReq, callOptions ...callopt.Option) (r *app.DeleteMessageResp, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.DeleteMessage(ctx, Req)
+}
+
+func (p *kAppServiceClient) ListAppMessage(ctx context.Context, Req *app.ListAppMessageReq, callOptions ...callopt.Option) (r *app.ListAppMessageResp, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.ListAppMessage(ctx, Req)
 }

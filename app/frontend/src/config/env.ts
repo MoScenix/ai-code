@@ -16,7 +16,7 @@ export const getDeployUrl = (deployKey: string) => {
   return `${DEPLOY_DOMAIN}/${deployKey}`
 }
 
-// 获取静态资源预览URL（后端只有 HTML：固定 html_<appId>）
+// 获取静态资源预览URL（后端只有 HTML：固定 <appId>）
 export const getStaticPreviewUrl = (appId: string) => {
-  return `${STATIC_BASE_URL}/app_${appId}/`
+  return `${STATIC_BASE_URL}/project/${appId}/index.html`
 }

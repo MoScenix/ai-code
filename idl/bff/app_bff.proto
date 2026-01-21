@@ -7,82 +7,71 @@ option go_package = "bff/app";
 import "api.proto";
 import "bff/common.proto";
 
-// =====================
-// Service
-// =====================
 service AppService {
 
-  // POST /app/add
   rpc AddApp(AppAddRequest) returns (BaseResponseLong) {
     option (api.post) = "/app/add";
   }
 
-  // POST /app/delete
   rpc DeleteApp(DeleteRequest) returns (BaseResponseBoolean) {
     option (api.post) = "/app/delete";
   }
 
-  // POST /app/update
   rpc UpdateApp(AppUpdateRequest) returns (BaseResponseBoolean) {
     option (api.post) = "/app/update";
   }
 
-  // GET /app/get/vo?id=xxx
   rpc GetAppVOById(GetAppVOByIdRequest) returns (BaseResponseAppVO) {
     option (api.get) = "/app/get/vo";
   }
 
-  // POST /app/my/list/page/vo
   rpc ListMyAppVOByPage(AppQueryRequest) returns (BaseResponsePageAppVO) {
     option (api.post) = "/app/my/list/page/vo";
   }
 
-  // POST /app/good/list/page/vo
   rpc ListGoodAppVOByPage(AppQueryRequest) returns (BaseResponsePageAppVO) {
     option (api.post) = "/app/good/list/page/vo";
   }
 
-  // POST /app/deploy
   rpc DeployApp(AppDeployRequest) returns (BaseResponseString) {
     option (api.post) = "/app/deploy";
   }
 
-  // GET /app/download/{appId}
   rpc DownloadAppCode(DownloadAppCodeRequest) returns (BaseResponseBytes) {
-    option (api.get) = "/app/download/{appId}";
+    option (api.get) = "/app/download/:appId";
   }
 
-  // GET /app/chat/gen/code?appId=xxx&message=yyy
-  rpc ChatToGenCode(ChatToGenCodeRequest) returns (ServerSentEventStringList) {
+  rpc ChatToGenCode(ChatToGenCodeRequest) returns (stream ServerSentEventString) {
     option (api.get) = "/app/chat/gen/code";
   }
 
-  // ===== Admin =====
+  // 管理员分页查询聊天记录
+  rpc ListAllChatHistoryByPageForAdmin(ChatHistoryQueryRequest) returns (BaseResponsePageChatHistory) {
+    option (api.post) = "/chatHistory/admin/list/page/vo";
+  }
 
-  // POST /app/admin/delete
+  // 按应用分页查询聊天记录
+  rpc ListAppChatHistory(ListAppChatHistoryRequest) returns (BaseResponsePageChatHistory) {
+    option (api.get) = "/chatHistory/app/:appId";
+  }
+
   rpc DeleteAppByAdmin(DeleteRequest) returns (BaseResponseBoolean) {
     option (api.post) = "/app/admin/delete";
   }
 
-  // POST /app/admin/update
   rpc UpdateAppByAdmin(AppAdminUpdateRequest) returns (BaseResponseBoolean) {
     option (api.post) = "/app/admin/update";
   }
 
-  // GET /app/admin/get/vo?id=xxx
   rpc GetAppVOByIdByAdmin(GetAppVOByIdByAdminRequest) returns (BaseResponseAppVO) {
     option (api.get) = "/app/admin/get/vo";
   }
 
-  // POST /app/admin/list/page/vo
   rpc ListAppVOByPageByAdmin(AppQueryRequest) returns (BaseResponsePageAppVO) {
     option (api.post) = "/app/admin/list/page/vo";
   }
 }
 
-// =====================
-// Common response wrappers
-// =====================
 message BaseResponseBoolean {
   int32 code = 1;
   bool data = 2;
@@ -113,22 +102,24 @@ message BaseResponsePageAppVO {
   string message = 3;
 }
 
-// 下载场景一般是 bytes/blob（你 TS 里是 any，这里给一个 bytes 包装）
+message BaseResponsePageChatHistory {
+  int32 code = 1;
+  PageChatHistory data = 2;
+  string message = 3;
+}
+
 message BaseResponseBytes {
   int32 code = 1;
   bytes data = 2;
   string message = 3;
 }
 
-// 你 TS 里写的是 ServerSentEventString[]，这里给一个列表包装。
-//（如果你们网关/框架对 SSE 有更标准的定义，可以替换掉）
-message ServerSentEventStringList {
-  repeated string data = 1;
+message ServerSentEventString {
+  string d = 1;
+  string message = 2;
 }
 
-// =====================
-// Requests
-// =====================
+
 message DeleteRequest {
   int64 id = 1;
 }
@@ -170,13 +161,11 @@ message DownloadAppCodeRequest {
   int64 appId = 1 [(api.path) = "appId"];
 }
 
-// TS 里 AppQueryRequest 字段很多，这里原样映射
 message AppQueryRequest {
   int64 pageNum = 1;
   int64 pageSize = 2;
   string sortField = 3;
   string sortOrder = 4;
-
   int64 id = 5;
   string appName = 6;
   string cover = 7;
@@ -187,9 +176,25 @@ message AppQueryRequest {
   int64 userId = 12;
 }
 
-// =====================
-// Entities / VOs
-// =====================
+message ChatHistoryQueryRequest {
+  int64 pageNum = 1;
+  int64 pageSize = 2;
+  string sortField = 3;
+  string sortOrder = 4;
+  int64 id = 5;
+  string message = 6;
+  string messageType = 7;
+  int64 appId = 8;
+  int64 userId = 9;
+  string lastCreateTime = 10;
+}
+
+message ListAppChatHistoryRequest {
+  int64 appId = 1 [(api.path) = "appId"];
+  int64 pageSize = 2 [(api.query) = "pageSize"];
+  string lastCreateTime = 3 [(api.query) = "lastCreateTime"];
+}
+
 message AppVO {
   int64 id = 1;
   string appName = 2;
@@ -200,14 +205,11 @@ message AppVO {
   string deployedTime = 7;
   int64 priority = 8;
   int64 userId = 9;
-
   string createTime = 10;
   string updateTime = 11;
-
   UserVO user = 12;
 }
 
-// 你 TS 里 AppVO.user 用的是 UserVO（沿用你 User 的 VO 结构）
 message UserVO {
   int64 id = 1;
   string userAccount = 2;
@@ -218,11 +220,28 @@ message UserVO {
   string createTime = 7;
 }
 
-// =====================
-// Pagination
-// =====================
+message ChatHistory {
+  int64 id = 1;
+  string message = 2;
+  string messageType = 3;
+  int64 appId = 4;
+  int64 userId = 5;
+  string createTime = 6;
+  string updateTime = 7;
+  int64 isDelete = 8;
+}
+
 message PageAppVO {
   repeated AppVO records = 1;
+  int64 pageNumber = 2;
+  int64 pageSize = 3;
+  int64 totalPage = 4;
+  int64 totalRow = 5;
+  bool optimizeCountQuery = 6;
+}
+
+message PageChatHistory {
+  repeated ChatHistory records = 1;
   int64 pageNumber = 2;
   int64 pageSize = 3;
   int64 totalPage = 4;

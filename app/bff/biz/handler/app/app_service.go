@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/service"
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
@@ -158,7 +159,7 @@ func DeployApp(ctx context.Context, c *app.RequestContext) {
 }
 
 // DownloadAppCode .
-// @router /app/download/{appId} [GET]
+// @router /app/download/:appId [GET]
 func DownloadAppCode(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req lapp.DownloadAppCodeRequest
@@ -175,28 +176,7 @@ func DownloadAppCode(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
-}
-
-// ChatToGenCode .
-// @router /app/chat/gen/code [GET]
-func ChatToGenCode(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req lapp.ChatToGenCodeRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
-		return
-	}
-
-	resp := &lapp.ServerSentEventStringList{}
-	resp, err = service.NewChatToGenCodeService(ctx, c).Run(&req)
-	if err != nil {
-		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
-		return
-	}
-
-	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+	c.Data(200, "application/zip", resp.Data)
 }
 
 // DeleteAppByAdmin .
@@ -280,5 +260,66 @@ func ListAppVOByPageByAdmin(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// ChatToGenCode .
+// @router /app/chat/gen/code [GET]
+func ChatToGenCode(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.ChatToGenCodeRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewChatToGenCodeService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// ListAllChatHistoryByPageForAdmin .
+// @router /chatHistory/admin/list/page/vo [POST]
+func ListAllChatHistoryByPageForAdmin(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.ChatHistoryQueryRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewListAllChatHistoryByPageForAdminService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// ListAppChatHistory .
+// @router /chatHistory/app/:appId [GET]
+func ListAppChatHistory(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.ListAppChatHistoryRequest
+	err = c.BindAndValidate(&req)
+	fmt.Printf("bind err=%v, req=%+v\n", err, req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewListAppChatHistoryService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
 	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
 }

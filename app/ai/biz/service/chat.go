@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"os"
 
@@ -20,8 +21,15 @@ type ChatService struct {
 func NewChatService(ctx context.Context) *ChatService {
 	return &ChatService{ctx: ctx}
 }
+func Reverse[T any](s []T) {
+	for i, j := 0, len(s)-1; i < j; i, j = i+1, j-1 {
+		s[i], s[j] = s[j], s[i]
+	}
+}
 
 func (s *ChatService) Run(req *ai.AiReq, stream ai.AiService_ChatServer) (err error) {
+	Reverse(req.History)
+	fmt.Println(req.History)
 	s.ctx = context.WithValue(s.ctx, utils.ProjectRootPath, req.ProjectId)
 	agent := chat.NewAiAgent(s.ctx)
 	var messages []*schema.Message

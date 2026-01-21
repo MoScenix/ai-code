@@ -43,3 +43,24 @@ func (s *AppServiceImpl) ListApp(ctx context.Context, req *app.ListAppReq) (resp
 
 	return resp, err
 }
+
+// AddMessage implements the AppServiceImpl interface.
+func (s *AppServiceImpl) AddMessage(ctx context.Context, req *app.AddMessageReq) (resp *app.AddMessageResp, err error) {
+	resp, err = service.NewAddMessageService(ctx).Run(req)
+
+	return resp, err
+}
+
+// DeleteMessage implements the AppServiceImpl interface.
+func (s *AppServiceImpl) DeleteMessage(ctx context.Context, req *app.DeleteMessageReq) (resp *app.DeleteMessageResp, err error) {
+	resp, err = service.NewDeleteMessageService(ctx).Run(req)
+
+	return resp, err
+}
+
+// ListAppMessage implements the AppServiceImpl interface.
+func (s *AppServiceImpl) ListAppMessage(ctx context.Context, req *app.ListAppMessageReq) (resp *app.ListAppMessageResp, err error) {
+	resp, err = service.NewListAppMessageService(ctx).Run(req)
+
+	return resp, err
+}

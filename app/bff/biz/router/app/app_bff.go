@@ -48,7 +48,7 @@ func Register(r *server.Hertz) {
 		}
 		{
 			_download := _app.Group("/download", _downloadMw()...)
-			_download.GET("/{appId}", append(_downloadappcodeMw(), app.DownloadAppCode)...)
+			_download.GET("/:appId", append(_downloadappcodeMw(), app.DownloadAppCode)...)
 		}
 		{
 			_get0 := _app.Group("/get", _get0Mw()...)
@@ -73,6 +73,23 @@ func Register(r *server.Hertz) {
 					_page1.POST("/vo", append(_listmyappvobypageMw(), app.ListMyAppVOByPage)...)
 				}
 			}
+		}
+	}
+	{
+		_chathistory := root.Group("/chatHistory", _chathistoryMw()...)
+		{
+			_admin0 := _chathistory.Group("/admin", _admin0Mw()...)
+			{
+				_list2 := _admin0.Group("/list", _list2Mw()...)
+				{
+					_page2 := _list2.Group("/page", _page2Mw()...)
+					_page2.POST("/vo", append(_listallchathistorybypageforadminMw(), app.ListAllChatHistoryByPageForAdmin)...)
+				}
+			}
+		}
+		{
+			_app0 := _chathistory.Group("/app", _app0Mw()...)
+			_app0.GET("/:appId", append(_listappchathistoryMw(), app.ListAppChatHistory)...)
 		}
 	}
 }

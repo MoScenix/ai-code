@@ -76,9 +76,9 @@ func TestChat_Run(t *testing.T) {
 	target := filepath.Clean(filepath.Join(baseDir, "../../"))
 	godotenv.Load()
 	req := &ai.AiReq{
-		ProjectId: "demo",
+		ProjectId: "7",
 		History: []*ai.HistoryItem{
-			{Role: "user", Question: `生成一个upcpc算法竞赛介绍网页`},
+			{Role: "user", Question: `生成一个hello world网页，点击文字改变文字颜色`},
 		},
 	}
 	_ = os.Chdir(target)

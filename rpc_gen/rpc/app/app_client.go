@@ -17,6 +17,9 @@ type RPCClient interface {
 	UpdateApp(ctx context.Context, Req *app.UpdateAppReq, callOptions ...callopt.Option) (r *app.UpdateAppResp, err error)
 	GetApp(ctx context.Context, Req *app.GetAppReq, callOptions ...callopt.Option) (r *app.GetAppResp, err error)
 	ListApp(ctx context.Context, Req *app.ListAppReq, callOptions ...callopt.Option) (r *app.ListAppResp, err error)
+	AddMessage(ctx context.Context, Req *app.AddMessageReq, callOptions ...callopt.Option) (r *app.AddMessageResp, err error)
+	DeleteMessage(ctx context.Context, Req *app.DeleteMessageReq, callOptions ...callopt.Option) (r *app.DeleteMessageResp, err error)
+	ListAppMessage(ctx context.Context, Req *app.ListAppMessageReq, callOptions ...callopt.Option) (r *app.ListAppMessageResp, err error)
 }
 
 func NewRPCClient(dstService string, opts ...client.Option) (RPCClient, error) {
@@ -63,4 +66,16 @@ func (c *clientImpl) GetApp(ctx context.Context, Req *app.GetAppReq, callOptions
 
 func (c *clientImpl) ListApp(ctx context.Context, Req *app.ListAppReq, callOptions ...callopt.Option) (r *app.ListAppResp, err error) {
 	return c.kitexClient.ListApp(ctx, Req, callOptions...)
+}
+
+func (c *clientImpl) AddMessage(ctx context.Context, Req *app.AddMessageReq, callOptions ...callopt.Option) (r *app.AddMessageResp, err error) {
+	return c.kitexClient.AddMessage(ctx, Req, callOptions...)
+}
+
+func (c *clientImpl) DeleteMessage(ctx context.Context, Req *app.DeleteMessageReq, callOptions ...callopt.Option) (r *app.DeleteMessageResp, err error) {
+	return c.kitexClient.DeleteMessage(ctx, Req, callOptions...)
+}
+
+func (c *clientImpl) ListAppMessage(ctx context.Context, Req *app.ListAppMessageReq, callOptions ...callopt.Option) (r *app.ListAppMessageResp, err error) {
+	return c.kitexClient.ListAppMessage(ctx, Req, callOptions...)
 }

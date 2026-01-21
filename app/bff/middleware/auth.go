@@ -32,7 +32,14 @@ func Auth() app.HandlerFunc {
 		path := c.Path()
 		if ctx.Value(utils.UserIdKey) == nil || ctx.Value(utils.UserRoleKey) != utils.AdminRole {
 			if strings.Contains(string(path), "/admin") {
-				c.Redirect(consts.StatusFound, []byte("user/login"))
+				c.Redirect(consts.StatusFound, []byte("/user/login"))
+				c.Abort()
+				return
+			}
+		}
+		if ctx.Value(utils.UserIdKey) == nil {
+			if strings.Contains(string(path), "/app") {
+				c.Redirect(consts.StatusFound, []byte("/user/login"))
 				c.Abort()
 				return
 			}

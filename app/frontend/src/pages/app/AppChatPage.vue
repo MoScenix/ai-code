@@ -1,136 +1,120 @@
 <template>
-  <div id="appChatPage">
-    <!-- 顶部栏 -->
-    <div class="header-bar">
-      <div class="header-left">
-        <h1 class="app-name">{{ appInfo?.appName || '网站生成器' }}</h1>
+  <div class="h-screen w-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <header
+      class="h-16 flex items-center justify-between px-6 bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
+      <div class="flex items-center gap-3">
+        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
+          <GlobalOutlined class="text-white text-lg" />
+        </div>
+        <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-500">
+          {{ appInfo?.appName || '网站生成器' }}
+        </h1>
       </div>
-      <div class="header-right">
-        <a-button type="default" @click="showAppDetail">
+
+      <div class="flex items-center gap-2">
+        <a-button type="text" @click="showAppDetail" class="!flex !items-center hover:!bg-slate-100 !rounded-full">
           <template #icon>
             <InfoCircleOutlined />
           </template>
           应用详情
         </a-button>
-        <a-button
-          type="primary"
-          ghost
-          @click="downloadCode"
-          :loading="downloading"
-          :disabled="!isOwner"
-        >
+        <div class="h-4 w-[1px] bg-slate-200 mx-2"></div>
+        <a-button type="default" @click="downloadCode" :loading="downloading" :disabled="!isOwner"
+          class="!rounded-full !border-slate-200 hover:!border-blue-500 hover:!text-blue-500">
           <template #icon>
             <DownloadOutlined />
           </template>
           下载代码
         </a-button>
-        <a-button type="primary" @click="deployApp" :loading="deploying">
+        <a-button type="primary" @click="deployApp" :loading="deploying"
+          class="!rounded-full !bg-blue-600 shadow-md shadow-blue-100 hover:!scale-105 transition-transform">
           <template #icon>
             <CloudUploadOutlined />
           </template>
-          部署
+          部署发布
         </a-button>
       </div>
-    </div>
+    </header>
 
-    <!-- 主要内容区域 -->
-    <div class="main-content">
-      <!-- 左侧对话区域 -->
-      <div class="chat-section">
-        <!-- 消息区域 -->
-        <div class="messages-container" ref="messagesContainer">
-          <!-- 加载更多按钮 -->
-          <div v-if="hasMoreHistory" class="load-more-container">
-            <a-button type="link" @click="loadMoreHistory" :loading="loadingHistory" size="small">
-              加载更多历史消息
+    <main class="flex-1 flex overflow-hidden p-4 gap-4">
+
+      <section
+        class="flex-1 min-w-[400px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth custom-scrollbar">
+          <div v-if="hasMoreHistory" class="flex justify-center">
+            <a-button type="link" @click="loadMoreHistory" :loading="loadingHistory" size="small"
+              class="text-slate-400 font-normal">
+              查看更早的历史消息
             </a-button>
           </div>
 
-          <div v-for="(message, index) in messages" :key="index" class="message-item">
-            <div v-if="message.type === 'user'" class="user-message">
-              <div class="message-content">{{ message.content }}</div>
-              <div class="message-avatar">
-                <a-avatar :src="loginUserStore.loginUser.userAvatar" />
+          <div v-for="(message, index) in messages" :key="index"
+            class="animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div v-if="message.type === 'user'" class="flex justify-end gap-3 pl-12">
+              <div class="max-w-[78%] bg-gradient-to-br from-blue-600 to-blue-500 text-white px-4 py-3
+         rounded-2xl rounded-tr-md shadow-[0_10px_28px_rgba(37,99,235,0.25)]
+         text-[15px] leading-[1.75] tracking-[0.2px] whitespace-pre-wrap break-words">
+                {{ message.content }}
               </div>
+
+              <a-avatar :src="loginUserStore.loginUser.userAvatar"
+                class="flex-shrink-0 border-2 border-white shadow-sm" />
             </div>
 
-            <div v-else class="ai-message">
-              <div class="message-avatar">
-                <a-avatar :src="aiAvatar" />
-              </div>
-              <div class="message-content">
-                <MarkdownRenderer v-if="message.content" :content="message.content" />
-                <div v-if="message.loading" class="loading-indicator">
-                  <a-spin size="small" />
-                  <span>AI 正在思考...</span>
+            <div v-else class="flex justify-start gap-3 pr-12">
+              <a-avatar :src="aiAvatar" class="flex-shrink-0 border border-slate-100 shadow-sm" />
+              <div class="flex-1">
+                <div class="max-w-[78%] bg-white text-slate-800 px-4 py-3 rounded-2xl rounded-tl-md
+         border border-slate-200 shadow-[0_10px_28px_rgba(15,23,42,0.06)]
+         text-[15px] leading-[1.75] tracking-[0.2px] relative break-words">
+                  <div class="custom-md markdown-content">
+                    <MarkdownRenderer v-if="message.content" :content="message.content" />
+                  </div>
+
+                  <div v-if="message.loading" class="flex items-center gap-2 py-2 text-slate-400">
+                    <a-spin size="small" />
+                    <span class="text-xs animate-pulse">正在构思方案...</span>
+                  </div>
                 </div>
+
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 选中元素信息展示 -->
-        <a-alert
-          v-if="selectedElementInfo"
-          class="selected-element-alert"
-          type="info"
-          closable
-          @close="clearSelectedElement"
-        >
-          <template #message>
-            <div class="selected-element-info">
-              <div class="element-header">
-                <span class="element-tag">
-                  选中元素：{{ selectedElementInfo.tagName.toLowerCase() }}
-                </span>
-                <span v-if="selectedElementInfo.id" class="element-id">
-                  #{{ selectedElementInfo.id }}
-                </span>
-                <span v-if="selectedElementInfo.className" class="element-class">
-                  .{{ selectedElementInfo.className.split(' ').join('.') }}
-                </span>
+        <div class="p-4 bg-white border-t border-slate-100">
+          <div v-if="selectedElementInfo" class="mb-3">
+            <div
+              class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 animate-in zoom-in-95">
+              <div class="flex items-center gap-2 overflow-hidden">
+                <span class="px-1.5 py-0.5 bg-amber-200 text-amber-800 rounded text-[10px] font-bold">选中元素</span>
+                <span class="text-xs text-amber-900 truncate font-mono">{{ selectedElementInfo.tagName.toLowerCase()
+                }}{{
+                    selectedElementInfo.id ? '#' + selectedElementInfo.id : '' }}</span>
               </div>
-              <div class="element-details">
-                <div v-if="selectedElementInfo.textContent" class="element-item">
-                  内容: {{ selectedElementInfo.textContent.substring(0, 50) }}
-                  {{ selectedElementInfo.textContent.length > 50 ? '...' : '' }}
-                </div>
-                <div v-if="selectedElementInfo.pagePath" class="element-item">
-                  页面路径: {{ selectedElementInfo.pagePath }}
-                </div>
-                <div class="element-item">
-                  选择器:
-                  <code class="element-selector-code">{{ selectedElementInfo.selector }}</code>
-                </div>
-              </div>
+              <button @click="clearSelectedElement" class="text-amber-400 hover:text-amber-600 transition-colors">
+                <CloseCircleFilled />
+              </button>
             </div>
-          </template>
-        </a-alert>
+          </div>
 
-        <!-- 用户消息输入框 -->
-        <div class="input-container">
-          <div class="input-wrapper">
-            <a-tooltip v-if="!isOwner" title="无法在别人的作品下对话哦~" placement="top">
-              <a-textarea
-                v-model:value="userInput"
-                :placeholder="getInputPlaceholder()"
-                :rows="4"
-                :maxlength="1000"
-                @keydown.enter.prevent="sendMessage"
-                :disabled="isGenerating || !isOwner"
-              />
-            </a-tooltip>
-            <a-textarea
-              v-else
-              v-model:value="userInput"
-              :placeholder="getInputPlaceholder()"
-              :rows="4"
-              :maxlength="1000"
-              @keydown.enter.prevent="sendMessage"
-              :disabled="isGenerating"
-            />
-            <div class="input-actions">
-              <a-button type="primary" @click="sendMessage" :loading="isGenerating" :disabled="!isOwner">
+          <div class="relative rounded-xl border-2 transition-all p-1" :class="[
+            isEditMode ? 'border-amber-400 bg-amber-50/20' : 'border-slate-200 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/10'
+          ]">
+            <a-textarea v-model:value="userInput" :placeholder="getInputPlaceholder()" :rows="4"
+              :disabled="isGenerating || (!isOwner && !isAdmin)" :bordered="false"
+              class="!bg-transparent !resize-none !text-slate-700 !shadow-none" @keydown.enter.prevent="sendMessage" />
+
+            <div class="flex items-center justify-between px-2 pb-1">
+              <div class="text-[11px] text-slate-400 flex items-center gap-1">
+                <span v-if="isOwner">回车键发送，Shift+Enter 换行</span>
+                <span v-else class="text-amber-500">
+                  <LockOutlined /> 访客模式不可编辑
+                </span>
+              </div>
+              <a-button type="primary" @click="sendMessage" :loading="isGenerating"
+                :disabled="!isOwner || !userInput.trim()"
+                class="!h-9 !w-9 !flex !items-center !justify-center !rounded-lg !bg-blue-600 shadow-lg shadow-blue-500/20">
                 <template #icon>
                   <SendOutlined />
                 </template>
@@ -138,70 +122,86 @@
             </div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- 右侧网页展示区域 -->
-      <div class="preview-section">
-        <div class="preview-header">
-          <h3>生成后的网页展示</h3>
-          <div class="preview-actions">
-            <a-button
-              v-if="isOwner && previewUrl"
-              type="link"
-              :danger="isEditMode"
-              @click="toggleEditMode"
-              :class="{ 'edit-mode-active': isEditMode }"
-              style="padding: 0; height: auto; margin-right: 12px"
-            >
+      <section
+        class="flex-[1.5] flex flex-col bg-white rounded-2xl shadow-xl shadow-slate-200/50 border border-slate-200 overflow-hidden relative group">
+        <div class="h-11 bg-slate-50 flex items-center px-4 justify-between border-b border-slate-200">
+          <div class="flex items-center gap-2 w-1/4">
+            <div class="w-3 h-3 rounded-full bg-slate-200 group-hover:bg-[#FF5F57] transition-colors"></div>
+            <div class="w-3 h-3 rounded-full bg-slate-200 group-hover:bg-[#FFBD2E] transition-colors"></div>
+            <div class="w-3 h-3 rounded-full bg-slate-200 group-hover:bg-[#28C840] transition-colors"></div>
+          </div>
+
+          <div class="flex-1 flex items-center justify-center">
+            <span class="px-3 py-1 rounded-full text-[12px] font-semibold border shadow-sm" :class="previewUrl
+              ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
+              : 'bg-rose-50 text-rose-700 border-rose-200'">
+              {{ previewUrl ? '预览成功' : '预览失败' }}
+            </span>
+          </div>
+
+          <ReloadOutlined class="text-[10px] text-slate-400 cursor-pointer hover:text-blue-500 transition-colors"
+            @click="updatePreview" />
+
+
+
+          <div class="w-1/4 flex justify-end gap-2">
+            <a-button v-if="isOwner && previewUrl" type="text" size="small" @click="toggleEditMode"
+              class="!text-xs !flex !items-center !gap-1 !rounded-md"
+              :class="isEditMode ? '!text-blue-600 !bg-blue-50' : '!text-slate-500 hover:!bg-slate-100'">
               <template #icon>
                 <EditOutlined />
               </template>
-              {{ isEditMode ? '退出编辑' : '编辑模式' }}
+              {{ isEditMode ? '停止选择' : '点击选择' }}
             </a-button>
-            <a-button v-if="previewUrl" type="link" @click="openInNewTab">
+
+            <div class="w-[1px] h-4 bg-slate-200 mx-1 self-center"></div>
+
+            <a-button type="text" size="small" @click="openInNewTab"
+              class="!text-slate-500 hover:!bg-slate-100 !flex !items-center !justify-center">
               <template #icon>
                 <ExportOutlined />
               </template>
-              新窗口打开
             </a-button>
           </div>
         </div>
 
-        <div class="preview-content">
-          <div v-if="!previewUrl && !isGenerating" class="preview-placeholder">
-            <div class="placeholder-icon">🌐</div>
-            <p>网站文件生成完成后将在这里展示</p>
+        <div class="flex-1 bg-white relative">
+          <div v-if="!previewUrl && !isGenerating"
+            class="absolute inset-0 flex flex-col items-center justify-center text-slate-300 gap-4">
+            <div
+              class="w-16 h-16 rounded-3xl bg-slate-50 flex items-center justify-center border border-slate-100 shadow-inner">
+              <GlobalOutlined class="text-3xl" />
+            </div>
+            <div class="text-center">
+              <p class="text-sm font-semibold text-slate-400">等待页面生成...</p>
+              <p class="text-xs text-slate-300 mt-1">在左侧描述你的需求，AI 将实时渲染页面</p>
+            </div>
           </div>
-          <div v-else-if="isGenerating" class="preview-loading">
+
+          <div v-else-if="isGenerating && !previewUrl"
+            class="absolute inset-0 flex flex-col items-center justify-center bg-white/80 backdrop-blur-sm z-20">
             <a-spin size="large" />
-            <p>正在生成网站...</p>
+            <p class="mt-4 text-slate-500 text-sm font-medium animate-pulse">正在构建页面代码...</p>
           </div>
-          <iframe
-            v-else
-            :src="previewUrl"
-            class="preview-iframe"
-            frameborder="0"
-            @load="onIframeLoad"
-          ></iframe>
+
+          <iframe ref="previewIframe" v-show="previewUrl" :src="previewUrl"
+            class="w-full h-full border-none shadow-inner" @load="onIframeLoad" />
+
+
+          <div v-if="isEditMode"
+            class="absolute bottom-6 left-1/2 -translate-x-1/2 px-5 py-2.5 bg-blue-600 text-white rounded-full text-xs font-bold shadow-2xl shadow-blue-500/40 animate-bounce pointer-events-none z-30 flex items-center gap-2">
+            <span class="w-2 h-2 bg-white rounded-full animate-ping"></span>
+            请在上方点击你想修改的网页元素
+          </div>
         </div>
-      </div>
-    </div>
+      </section>
+    </main>
 
-    <!-- 应用详情弹窗 -->
-    <AppDetailModal
-      v-model:open="appDetailVisible"
-      :app="appInfo"
-      :show-actions="isOwner || isAdmin"
-      @edit="editApp"
-      @delete="deleteApp"
-    />
-
-    <!-- 部署成功弹窗 -->
-    <DeploySuccessModal
-      v-model:open="deployModalVisible"
-      :deploy-url="deployUrl"
-      @open-site="openDeployedSite"
-    />
+    <AppDetailModal v-model:open="appDetailVisible" :app="appInfo" :show-actions="isOwner || isAdmin" @edit="editApp"
+      @delete="deleteApp" />
+    <DeploySuccessModal v-model:open="deployModalVisible" :deploy-url="deployUrl" @open-site="openDeployedSite" />
   </div>
 </template>
 
@@ -309,6 +309,7 @@ const loadChatHistory = async (isLoadMore = false) => {
       params.lastCreateTime = lastCreateTime.value
     }
     const res = await listAppChatHistory(params)
+    console.log('listAppChatHistory raw res =', res)
     if (res.data.code === 0 && res.data.data) {
       const chatHistories = res.data.data.records || []
       if (chatHistories.length > 0) {
@@ -644,11 +645,11 @@ const deployApp = async () => {
   deploying.value = true
   try {
     const res = await deployAppApi({
-      appId: appId.value as unknown as number,
+      appId: Number(appId.value),
     })
-
     if (res.data.code === 0 && res.data.data) {
-      deployUrl.value = res.data.data
+      const deployPath = res.data.data
+      deployUrl.value = new URL(deployPath, window.location.origin).toString()
       deployModalVisible.value = true
       message.success('部署成功')
     } else {
@@ -677,14 +678,29 @@ const openDeployedSite = () => {
 }
 
 // iframe加载完成
+const previewIframe = ref<HTMLIFrameElement | null>(null)
 const onIframeLoad = () => {
+  console.log('[iframe] loaded:', previewUrl.value)
   previewReady.value = true
-  const iframe = document.querySelector('.preview-iframe') as HTMLIFrameElement
-  if (iframe) {
+
+  const iframe = previewIframe.value
+  if (!iframe) {
+    console.warn('[iframe] ref is null')
+    return
+  }
+
+  try {
+    // 关键：这里如果跨域会直接报错
+    void iframe.contentDocument // 触发一下访问，能快速发现跨域问题
     visualEditor.init(iframe)
     visualEditor.onIframeLoad()
+    console.log('[visualEditor] init OK')
+  } catch (e) {
+    console.error('[visualEditor] init FAILED (maybe cross-origin):', e)
+    message.error('预览页跨域，无法开启点击选择')
   }
 }
+
 
 // 编辑应用
 const editApp = () => {
@@ -714,20 +730,28 @@ const deleteApp = async () => {
 
 // 可视化编辑相关函数
 const toggleEditMode = () => {
-  // 检查 iframe 是否已经加载
-  const iframe = document.querySelector('.preview-iframe') as HTMLIFrameElement
+  console.log('[toggleEditMode] click', { previewReady: previewReady.value, previewUrl: previewUrl.value })
+
+  const iframe = previewIframe.value
   if (!iframe) {
-    message.warning('请等待页面加载完成')
+    message.warning('预览 iframe 未挂载')
     return
   }
-  // 确保 visualEditor 已初始化
   if (!previewReady.value) {
     message.warning('请等待页面加载完成')
     return
   }
-  const newEditMode = visualEditor.toggleEditMode()
-  isEditMode.value = newEditMode
+
+  try {
+    const newEditMode = visualEditor.toggleEditMode()
+    isEditMode.value = newEditMode
+    console.log('[toggleEditMode] newEditMode=', newEditMode)
+  } catch (e) {
+    console.error('[toggleEditMode] failed:', e)
+    message.error('开启点击选择失败（可能跨域或未初始化）')
+  }
 }
+
 
 const clearSelectedElement = () => {
   selectedElementInfo.value = null
@@ -758,309 +782,22 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-#appChatPage {
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  padding: 16px;
-  background: #fdfdfd;
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
 }
 
-/* 顶部栏 */
-.header-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 16px;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
 }
 
-.header-left {
-  display: flex;
-  align-items: center;
-  gap: 12px;
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+  border-radius: 10px;
 }
 
-.app-name {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #1a1a1a;
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #cbd5e1;
 }
 
-.header-right {
-  display: flex;
-  gap: 12px;
-}
-
-/* 主要内容区域 */
-.main-content {
-  flex: 1;
-  display: flex;
-  gap: 16px;
-  padding: 8px;
-  overflow: hidden;
-}
-
-/* 左侧对话区域 */
-.chat-section {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.messages-container {
-  flex: 0.9;
-  padding: 16px;
-  overflow-y: auto;
-  scroll-behavior: smooth;
-}
-
-.message-item {
-  margin-bottom: 12px;
-}
-
-.user-message {
-  display: flex;
-  justify-content: flex-end;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.ai-message {
-  display: flex;
-  justify-content: flex-start;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.message-content {
-  max-width: 70%;
-  padding: 12px 16px;
-  border-radius: 12px;
-  line-height: 1.5;
-  word-wrap: break-word;
-}
-
-.user-message .message-content {
-  background: #1890ff;
-  color: white;
-}
-
-.ai-message .message-content {
-  background: #f5f5f5;
-  color: #1a1a1a;
-  padding: 8px 12px;
-}
-
-.message-avatar {
-  flex-shrink: 0;
-}
-
-.loading-indicator {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  color: #666;
-}
-
-/* 加载更多按钮 */
-.load-more-container {
-  text-align: center;
-  padding: 8px 0;
-  margin-bottom: 16px;
-}
-
-/* 输入区域 */
-.input-container {
-  padding: 16px;
-  background: white;
-}
-
-.input-wrapper {
-  position: relative;
-}
-
-.input-wrapper .ant-input {
-  padding-right: 50px;
-}
-
-.input-actions {
-  position: absolute;
-  bottom: 8px;
-  right: 8px;
-}
-
-/* 右侧预览区域 */
-.preview-section {
-  flex: 3;
-  display: flex;
-  flex-direction: column;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  border-bottom: 1px solid #e8e8e8;
-}
-
-.preview-header h3 {
-  margin: 0;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.preview-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.preview-content {
-  flex: 1;
-  position: relative;
-  overflow: hidden;
-}
-
-.preview-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #666;
-}
-
-.placeholder-icon {
-  font-size: 48px;
-  margin-bottom: 16px;
-}
-
-.preview-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  color: #666;
-}
-
-.preview-loading p {
-  margin-top: 16px;
-}
-
-.preview-iframe {
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-.selected-element-alert {
-  margin: 0 16px;
-}
-
-/* 响应式设计 */
-@media (max-width: 1024px) {
-  .main-content {
-    flex-direction: column;
-  }
-
-  .chat-section,
-  .preview-section {
-    flex: none;
-    height: 50vh;
-  }
-}
-
-@media (max-width: 768px) {
-  .header-bar {
-    padding: 12px 16px;
-  }
-
-  .app-name {
-    font-size: 16px;
-  }
-
-  .main-content {
-    padding: 8px;
-    gap: 8px;
-  }
-
-  .message-content {
-    max-width: 85%;
-  }
-
-  /* 选中元素信息样式 */
-  .selected-element-alert {
-    margin: 0 16px;
-  }
-
-  .selected-element-info {
-    line-height: 1.4;
-  }
-
-  .element-header {
-    margin-bottom: 8px;
-  }
-
-  .element-details {
-    margin-top: 8px;
-  }
-
-  .element-item {
-    margin-bottom: 4px;
-    font-size: 13px;
-  }
-
-  .element-item:last-child {
-    margin-bottom: 0;
-  }
-
-  .element-tag {
-    font-family: 'Monaco', 'Menlo', monospace;
-    font-size: 14px;
-    font-weight: 600;
-    color: #007bff;
-  }
-
-  .element-id {
-    color: #28a745;
-    margin-left: 4px;
-  }
-
-  .element-class {
-    color: #ffc107;
-    margin-left: 4px;
-  }
-
-  .element-selector-code {
-    font-family: 'Monaco', 'Menlo', monospace;
-    background: #f6f8fa;
-    padding: 2px 4px;
-    border-radius: 3px;
-    font-size: 12px;
-    color: #d73a49;
-    border: 1px solid #e1e4e8;
-  }
-
-  /* 编辑模式按钮样式 */
-  .edit-mode-active {
-    background-color: #52c41a !important;
-    border-color: #52c41a !important;
-    color: white !important;
-  }
-
-  .edit-mode-active:hover {
-    background-color: #73d13d !important;
-    border-color: #73d13d !important;
-  }
-}
+/* 覆盖 Ant Design 部分全局样式 */
 </style>

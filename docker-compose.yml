@@ -1,9 +1,4 @@
 services:
-  # frontend:
-  #   build:
-  #     dockerfile: docker_file/DockerFile.frontend
-  #   ports:
-  #     - "8080:80"
   consul:
     image: consul:1.15.4
     ports:
@@ -54,6 +49,114 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
       - "3000:3000"
+  user:
+    # image: app-user:dev
+    build:
+      context: .
+      dockerfile: docker_files/DockerFile.user
+    ports:
+      - "8888:8888"
+    volumes:
+      - deploy:/deploy
+      - static:/static
+    environment:
+      - GO_ENV=online
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=YOUR_PASSWORD
+      - MYSQL_DATABASE=YOU_DB
+      - MYSQL_HOST=mysql
+    depends_on:
+      consul:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  ai:
+    # image: app-user:dev
+    build:
+      context: .
+      dockerfile: docker_files/DockerFile.ai
+    ports:
+      - "8889:8888"
+    volumes:
+      - deploy:/deploy
+      - static:/static
+    environment:
+      - GO_ENV=online
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=YOUR_PASSWORD
+      - MYSQL_DATABASE=YOU_DB
+      - MYSQL_HOST=mysql
+      - MODEL_NAME=
+      - DASHSCOPE_API_KEY=
+    depends_on:
+      consul:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  app:
+    # image: app-user:dev
+    build:
+      context: .
+      dockerfile: docker_files/DockerFile.app
+    ports:
+      - "8890:8888"
+    volumes:
+      - deploy:/deploy
+      - static:/static
+    environment:
+      - GO_ENV=online
+      - MYSQL_USER=root
+      - MYSQL_PASSWORD=YOUR_PASSWORD
+      - MYSQL_DATABASE=YOU_DB
+      - MYSQL_HOST=mysql
+    depends_on:
+      consul:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+  bff:
+    build:
+      context: .
+      dockerfile: docker_files/DockerFile.bff
+    ports:
+      - "8082:8080"
+    environment:
+      - GO_ENV=online
+      - SESSION_SECRET=YOUR_SESSION_SECRET
+    volumes:
+      - deploy:/deploy
+      - static:/static
+  frontend:
+    build:
+      dockerfile: docker_files/DockerFile.frontend
+    ports:
+      - "8080:80"
+    volumes:
+      - deploy:/deploy
+      - static:/static
+    depends_on:
+      consul:
+        condition: service_healthy
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      user:
+        condition: service_started
+      app:
+        condition: service_started
+      ai:
+        condition: service_started
+      bff:
+        condition: service_started
+    
 volumes:
   mysql_data: {} 
-  shared: {}
+  deploy: {}
+  static: {}

@@ -1,0 +1,44 @@
+# docker_files/DockerFile.bff
+FROM golang:1.25.5
+
+WORKDIR /usr/src/gomall
+
+ENV GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
+ENV GOSUMDB=sum.golang.google.cn
+
+COPY app/bff/go.mod app/bff/go.sum ./app/bff/
+COPY rpc_gen ./rpc_gen
+COPY common ./common
+
+RUN cd app/bff && go mod download && go mod verify
+
+COPY app/bff ./app/bff
+
+RUN cd app/bff && go build -v -o server
+RUN set -eux; \
+  mkdir -p /etc/apt/sources.list.d; \
+  rm -f /etc/apt/sources.list /etc/apt/sources.list.d/*; \
+  cat > /etc/apt/sources.list.d/debian.sources <<'EOF'
+Types: deb
+URIs: https://mirrors.aliyun.com/debian
+Suites: bookworm bookworm-updates
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+
+Types: deb
+URIs: https://mirrors.aliyun.com/debian-security
+Suites: bookworm-security
+Components: main contrib non-free non-free-firmware
+Signed-By: /usr/share/keyrings/debian-archive-keyring.gpg
+EOF
+RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    ca-certificates \
+    fonts-noto-cjk \
+    fonts-noto-color-emoji \
+  && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /usr/src/gomall/app/bff
+EXPOSE 8080
+CMD ["./server"]

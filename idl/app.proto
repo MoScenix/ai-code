@@ -16,13 +16,16 @@ message AppInfo {
   string createTime   = 10;
   string updateTime   = 11;
 }
+
 message AddAppReq {
   string initPrompt = 1;
+  int64 userId = 2;
 }
 
 message AddAppResp {
   int64 id = 1;
 }
+
 message DeleteAppReq {
   int64 id = 1;
 }
@@ -30,16 +33,19 @@ message DeleteAppReq {
 message DeleteAppResp {
   bool success = 1;
 }
+
 message UpdateAppReq {
   int64  id       = 1;
   string appName  = 2;
   string cover    = 3;
   int64  priority = 4;
+  string deployKey = 5;
 }
 
 message UpdateAppResp {
   bool success = 1;
 }
+
 message GetAppReq {
   int64 id = 1;
 }
@@ -47,20 +53,69 @@ message GetAppReq {
 message GetAppResp {
   AppInfo app = 1;
 }
+
 message ListAppReq {
   int64 pageNum  = 1;
   int64 pageSize = 2;
   string appName = 3;
   int64 userId = 4;
 }
+
 message ListAppResp {
   repeated AppInfo appList = 1;
   int64 total = 2;
 }
+
+message AppMessage {
+  int64 id = 1;
+  int64 appId = 2;
+  int64 userId = 3;
+  string role = 4;        
+  string content = 5;
+  string createTime = 6;
+  string updateTime = 7;
+  int64 isDelete = 8;
+}
+
+message AddMessageReq {
+  int64 appId = 1;
+  int64 userId = 2;
+  string role = 3;        
+  string content = 4;
+}
+
+message AddMessageResp {
+  int64 id = 1;
+}
+
+message DeleteMessageReq {
+  int64 id = 1;
+}
+
+message DeleteMessageResp {
+  bool success = 1;
+}
+
+message ListAppMessageReq {
+  int64 appId = 1;
+  int64 pageSize = 2;
+  string lastCreateTime = 3;
+}
+
+message ListAppMessageResp {
+  repeated AppMessage messageList = 1;
+  int64 total = 2;
+  bool hasMore = 3;
+}
+
 service AppService {
   rpc AddApp(AddAppReq) returns (AddAppResp);
   rpc DeleteApp(DeleteAppReq) returns (DeleteAppResp);
   rpc UpdateApp(UpdateAppReq) returns (UpdateAppResp);
   rpc GetApp(GetAppReq) returns (GetAppResp);
   rpc ListApp(ListAppReq) returns (ListAppResp);
+
+  rpc AddMessage(AddMessageReq) returns (AddMessageResp);
+  rpc DeleteMessage(DeleteMessageReq) returns (DeleteMessageResp);
+  rpc ListAppMessage(ListAppMessageReq) returns (ListAppMessageResp);
 }

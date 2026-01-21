@@ -116,23 +116,8 @@ func TestDeployApp(t *testing.T) {
 
 func TestDownloadAppCode(t *testing.T) {
 	h := server.Default()
-	h.GET("/app/download/{appId}", DownloadAppCode)
-	path := "/app/download/{appId}"                           // todo: you can customize query
-	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
-	header := ut.Header{}                                     // todo: you can customize header
-	w := ut.PerformRequest(h.Engine, "GET", path, body, header)
-	resp := w.Result()
-	t.Log(string(resp.Body()))
-
-	// todo edit your unit test.
-	// assert.DeepEqual(t, 200, resp.StatusCode())
-	// assert.DeepEqual(t, "null", string(resp.Body()))
-}
-
-func TestChatToGenCode(t *testing.T) {
-	h := server.Default()
-	h.GET("/app/chat/gen/code", ChatToGenCode)
-	path := "/app/chat/gen/code"                              // todo: you can customize query
+	h.GET("/app/download/:appId", DownloadAppCode)
+	path := "/app/download/:appId"                            // todo: you can customize query
 	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
 	header := ut.Header{}                                     // todo: you can customize header
 	w := ut.PerformRequest(h.Engine, "GET", path, body, header)
@@ -196,6 +181,50 @@ func TestListAppVOByPageByAdmin(t *testing.T) {
 	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
 	header := ut.Header{}                                     // todo: you can customize header
 	w := ut.PerformRequest(h.Engine, "POST", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+
+func TestChatToGenCode(t *testing.T) {
+	h := server.Default()
+	h.GET("/app/chat/gen/code", ChatToGenCode)
+	path := "/app/chat/gen/code"                              // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "GET", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+
+func TestListAllChatHistoryByPageForAdmin(t *testing.T) {
+	h := server.Default()
+	h.POST("/chatHistory/admin/list/page/vo", ListAllChatHistoryByPageForAdmin)
+	path := "/chatHistory/admin/list/page/vo"                 // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "POST", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+func TestListAppChatHistory(t *testing.T) {
+	h := server.Default()
+	h.GET("/chatHistory/app/:appId", ListAppChatHistory)
+	path := "/chatHistory/app/:appId"                         // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "GET", path, body, header)
 	resp := w.Result()
 	t.Log(string(resp.Body()))
 
