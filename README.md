@@ -27,4 +27,20 @@
 
 ### 主页
 ![](README/Home.png)
+![](README/Home1.png)
 
+### 用户中心
+
+![](README/UserCenter.png)
+
+### 聊天界面
+
+![](README/Chat.png)
+![](README/Chat1.png)
+
+### 用户管理
+![](README/UserManage.png)
+
+### 应用管理
+
+![](README/AppManage.png)
