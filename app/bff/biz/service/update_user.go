@@ -3,13 +3,15 @@ package service
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	user "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/user"
 	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
 	rpcuser "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/google/uuid"
 )
 
 type UpdateUserService struct {
@@ -22,16 +24,21 @@ func NewUpdateUserService(Context context.Context, RequestContext *app.RequestCo
 }
 
 func (h *UpdateUserService) Run(req *user.UserUpdateRequest) (resp *user.BaseResponseBoolean, err error) {
-	if int64(h.Context.Value(utils.UserIdKey).(float64)) != req.Id {
-		return &user.BaseResponseBoolean{
-			Code:    2,
-			Message: "用户id不一致",
-			Data:    false,
-		}, nil
+	if req.Id != 0 {
+		if int64(h.Context.Value(utils.UserIdKey).(float64)) != req.Id {
+			return &user.BaseResponseBoolean{
+				Code:    2,
+				Message: "用户id不一致",
+				Data:    false,
+			}, nil
+		}
+	} else {
+		req.Id = int64(h.Context.Value(utils.UserIdKey).(float64))
 	}
 	avatar, err := h.RequestContext.FormFile("avatar")
 	if avatar != nil && err == nil {
-		req.UserAvatar = "/share/avatar/" + uuid.New().String() + ".jpg"
+		req.UserAvatar = "/static/avatar/" + strconv.FormatInt(req.Id, 10) + ".jpg"
+		os.MkdirAll(filepath.Dir(req.UserAvatar), os.ModePerm)
 		h.RequestContext.SaveUploadedFile(avatar, req.UserAvatar)
 	}
 	fmt.Println(req)

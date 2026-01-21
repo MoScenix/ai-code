@@ -59,7 +59,6 @@ func newFakeChatStream() *fakeChatStream {
 func (f *fakeChatStream) Context() context.Context { return f.ctx }
 
 func (f *fakeChatStream) Send(resp *ai.AiResp) error {
-	fmt.Printf("%+v\n", resp)
 	return nil
 }
 func (f *fakeChatStream) Close() error {

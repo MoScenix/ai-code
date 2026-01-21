@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	user "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/user"
 	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
@@ -29,7 +28,6 @@ func (h *GetUserVOByIdService) Run(req *user.GetUserVOByIdRequest) (resp *user.B
 			Message: err.Error(),
 		}, nil
 	}
-	fmt.Println(res.CreateTime)
 	return &user.BaseResponseUserVO{
 		Code:    0,
 		Message: "success",

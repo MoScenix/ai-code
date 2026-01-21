@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -28,7 +27,6 @@ type FileItem struct {
 func ReadDirFunc(ctx context.Context, params *ReadDirParams) (ReadDirResult, error) {
 	projectPath := filepath.Join(conf.GetConf().ShareDir.ShareDir, ctx.Value(lutils.ProjectRootPath).(string))
 	target := filepath.Join(projectPath, params.Path)
-	fmt.Println("ReadDir" + target)
 	if !IsSubPathAbs(target, projectPath, true) {
 		return ReadDirResult{
 			Error: "路径不合法",

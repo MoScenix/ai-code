@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,7 +24,6 @@ func MkdirFunc(ctx context.Context, params *MkPathParams) (MkPathResult, error) 
 	projectPath := filepath.Join(conf.GetConf().ShareDir.ShareDir, ctx.Value(lutils.ProjectRootPath).(string))
 
 	target := filepath.Join(projectPath, params.Path)
-	fmt.Println("Mkpath" + target)
 	isDir := strings.HasSuffix(params.Path, "/")
 	if !IsSubPathAbs(target, projectPath, false) {
 		return MkPathResult{

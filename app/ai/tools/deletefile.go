@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -23,7 +22,6 @@ type DeleteFileResult struct {
 func DeleteFileFunc(ctx context.Context, params *DeleteFile) (DeleteFileResult, error) {
 	projectPath := filepath.Join(conf.GetConf().ShareDir.ShareDir, ctx.Value(lutils.ProjectRootPath).(string))
 	target := filepath.Join(projectPath, params.Path)
-	fmt.Println("DeleteFile" + target)
 	if !IsSubPathAbs(target, projectPath, false) {
 		return DeleteFileResult{
 			Ok:    false,

@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -24,8 +23,6 @@ type WriteFileResult struct {
 func WriteFileFunc(ctx context.Context, params *WriteFileParams) (WriteFileResult, error) {
 	projectPath := filepath.Join(conf.GetConf().ShareDir.ShareDir, ctx.Value(lutils.ProjectRootPath).(string))
 	target := filepath.Join(projectPath, params.Path)
-	fmt.Println("WriteFile" + target)
-	fmt.Printf("WriteFile %s (len=%d)\n", target, len(params.Content))
 	if !IsSubPathAbs(target, projectPath, false) {
 		return WriteFileResult{
 			Ok:    false,

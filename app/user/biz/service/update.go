@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/MoScenix/ai-code/app/user/biz/dal/mysql"
 	"github.com/MoScenix/ai-code/app/user/biz/model"
@@ -24,7 +23,6 @@ func (s *UpdateService) Run(req *user.UpdateReq) (resp *user.UpdateResp, err err
 		Name:        req.UserName,
 		UserProfile: req.UserProfile,
 	})
-	fmt.Println(err)
 	if err != nil {
 		return nil, err
 	}

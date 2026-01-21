@@ -2,7 +2,6 @@ package tools
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 
@@ -26,7 +25,6 @@ func ViewFileFunc(ctx context.Context, params *ViewFileParams) (ViewFileResult, 
 	projectPath := filepath.Join(conf.GetConf().ShareDir.ShareDir, ctx.Value(lutils.ProjectRootPath).(string))
 	target := filepath.Join(projectPath, params.Path)
 	target = filepath.Join(target, params.Name)
-	fmt.Println("ViewFile" + target)
 	if !IsSubPathAbs(target, projectPath, false) {
 		return ViewFileResult{
 			Error: "路径不合法",

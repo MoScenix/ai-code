@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	user "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/user"
@@ -28,7 +27,6 @@ func (h *UserRegisterService) Run(req *user.UserRegisterRequest) (resp *user.Bas
 			Message: "两次密码不一致",
 		}, nil
 	}
-	fmt.Println(111)
 	res, err := rpc.UserClient.Register(h.Context, &rpcuser.RegisterReq{
 		UserAccount:  req.UserAccount,
 		UserPassword: req.UserPassword,

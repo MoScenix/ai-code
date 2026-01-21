@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	common "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/common"
@@ -28,7 +27,6 @@ func (h *GetLoginUserService) Run(req *common.Empty) (resp *user.BaseResponseLog
 			Message: "未登录",
 		}, nil
 	}
-	fmt.Printf("%T\n", h.Context.Value(utils.UserIdKey))
 	res, err := rpc.UserClient.GetUser(h.Context, &rpcuser.GetUserReq{
 		Id: int64(h.Context.Value(utils.UserIdKey).(float64)),
 	})
@@ -38,7 +36,6 @@ func (h *GetLoginUserService) Run(req *common.Empty) (resp *user.BaseResponseLog
 			Message: err.Error(),
 		}, nil
 	}
-	fmt.Println(res.CreateTime)
 	return &user.BaseResponseLoginUserVO{
 		Code:    0,
 		Message: "success",

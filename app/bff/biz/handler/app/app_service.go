@@ -2,7 +2,6 @@ package app
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/service"
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
@@ -309,7 +308,6 @@ func ListAppChatHistory(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req lapp.ListAppChatHistoryRequest
 	err = c.BindAndValidate(&req)
-	fmt.Printf("bind err=%v, req=%+v\n", err, req)
 	if err != nil {
 		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
 		return

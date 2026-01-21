@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"os"
 
@@ -29,7 +28,6 @@ func Reverse[T any](s []T) {
 
 func (s *ChatService) Run(req *ai.AiReq, stream ai.AiService_ChatServer) (err error) {
 	Reverse(req.History)
-	fmt.Println(req.History)
 	s.ctx = context.WithValue(s.ctx, utils.ProjectRootPath, req.ProjectId)
 	agent := chat.NewAiAgent(s.ctx)
 	var messages []*schema.Message

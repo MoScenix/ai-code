@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"strconv"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
@@ -27,7 +26,6 @@ func (h *DeployAppService) Run(req *lapp.AppDeployRequest) (resp *lapp.BaseRespo
 	utils.CopyDir("/static/project/"+strconv.FormatInt(req.AppId, 10), "/deploy/"+deployKey)
 	err = utils.ScreenshotViewport("/static/project/"+strconv.FormatInt(req.AppId, 10)+"/", "/static/cover/"+deployKey+"/deploy.png")
 	if err != nil {
-		fmt.Println(err)
 		return &lapp.BaseResponseString{
 			Code:    1,
 			Message: err.Error(),

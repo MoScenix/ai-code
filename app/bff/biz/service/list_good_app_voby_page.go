@@ -40,6 +40,7 @@ func (h *ListGoodAppVOByPageService) Run(req *lapp.AppQueryRequest) (resp *lapp.
 			PageSize:   req.PageSize,
 			PageNumber: req.PageNum,
 			Records:    []*lapp.AppVO{},
+			TotalRow:   int64(len(res.AppList)),
 		},
 	}
 	q := rpc.UserClient

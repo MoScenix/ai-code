@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"context"
-	"fmt"
 	"strings"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
@@ -14,7 +13,6 @@ import (
 func GlobalAuth() app.HandlerFunc {
 	return func(ctx context.Context, c *app.RequestContext) {
 		session := sessions.Default(c)
-		fmt.Println(string(c.Path()))
 		userId := session.Get(utils.UserIdKey)
 		userRole := session.Get(utils.UserRoleKey)
 		if userId == nil || userRole == nil {
