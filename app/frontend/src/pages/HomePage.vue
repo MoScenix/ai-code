@@ -2,6 +2,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
+import { SendOutlined, ThunderboltOutlined } from '@ant-design/icons-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
 import { addApp, listMyAppVoByPage, listGoodAppVoByPage } from '@/api/appController'
 import { getDeployUrl } from '@/config/env'
@@ -167,20 +168,32 @@ onMounted(() => {
 
       <!-- 用户提示词输入框 -->
       <div class="input-section">
-        <a-textarea
-          v-model:value="userPrompt"
-          placeholder="帮我创建个人博客网站"
-          :rows="4"
-          :maxlength="1000"
-          class="prompt-input"
-        />
-        <div class="input-actions">
-          <a-button type="primary" size="large" @click="createApp" :loading="creating">
-            <template #icon>
-              <span>↑</span>
-            </template>
-          </a-button>
+        <div class="input-wrapper">
+          <a-textarea
+            v-model:value="userPrompt"
+            placeholder="描述你想创建的应用，例如：&#10;“帮我创建一个个人博客网站”&#10;“设计一个在线商城系统”"
+            :rows="5"
+            :maxlength="1000"
+            class="prompt-input"
+            @keydown.enter.prevent="(e: KeyboardEvent) => !e.shiftKey && createApp()"
+          />
+          <div class="input-actions">
+            <a-button
+              type="primary"
+              shape="circle"
+              size="large"
+              class="send-btn"
+              @click="createApp"
+              :loading="creating"
+              :disabled="!userPrompt.trim()"
+            >
+              <template #icon>
+                <SendOutlined />
+              </template>
+            </a-button>
+          </div>
         </div>
+        <div class="input-glow"></div>
       </div>
 
       <!-- 快捷按钮 -->
@@ -192,8 +205,10 @@ onMounted(() => {
               '创建一个现代化的个人博客网站，包含文章列表、详情页、分类标签、搜索功能、评论系统和个人简介页面。采用简洁的设计风格，支持响应式布局，文章支持Markdown格式，首页展示最新文章和热门推荐。',
             )
           "
-          >个人博客网站</a-button
         >
+          <template #icon><ThunderboltOutlined /></template>
+          个人博客网站
+        </a-button>
         <a-button
           type="default"
           @click="
@@ -201,8 +216,10 @@ onMounted(() => {
               '设计一个专业的企业官网，包含公司介绍、产品服务展示、新闻资讯、联系我们等页面。采用商务风格的设计，包含轮播图、产品展示卡片、团队介绍、客户案例展示，支持多语言切换和在线客服功能。',
             )
           "
-          >企业官网</a-button
         >
+          <template #icon><ThunderboltOutlined /></template>
+          企业官网
+        </a-button>
         <a-button
           type="default"
           @click="
@@ -210,8 +227,10 @@ onMounted(() => {
               '构建一个功能完整的在线商城，包含商品展示、购物车、用户注册登录、订单管理、支付结算等功能。设计现代化的商品卡片布局，支持商品搜索筛选、用户评价、优惠券系统和会员积分功能。',
             )
           "
-          >在线商城</a-button
         >
+          <template #icon><ThunderboltOutlined /></template>
+          在线商城
+        </a-button>
         <a-button
           type="default"
           @click="
@@ -219,8 +238,10 @@ onMounted(() => {
               '制作一个精美的作品展示网站，适合设计师、摄影师、艺术家等创作者。包含作品画廊、项目详情页、个人简历、联系方式等模块。采用瀑布流或网格布局展示作品，支持图片放大预览和作品分类筛选。',
             )
           "
-          >作品展示网站</a-button
         >
+          <template #icon><ThunderboltOutlined /></template>
+          作品展示网站
+        </a-button>
       </div>
 
       <!-- 我的作品 -->
@@ -445,33 +466,108 @@ onMounted(() => {
 /* 输入区域 */
 .input-section {
   position: relative;
-  margin: 0 auto 24px;
+  margin: 0 auto 40px;
   max-width: 800px;
+  z-index: 10;
+}
+
+.input-wrapper {
+  position: relative;
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.8);
+  padding: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.1),
+    0 2px 4px -1px rgba(0, 0, 0, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  backdrop-filter: blur(20px);
+}
+
+.input-wrapper:focus-within {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.1),
+    0 10px 10px -5px rgba(0, 0, 0, 0.04),
+    0 0 0 2px rgba(59, 130, 246, 0.5);
+  transform: translateY(-2px);
 }
 
 .prompt-input {
   border-radius: 16px;
-  border: none;
+  border: none !important;
   font-size: 16px;
-  padding: 20px 60px 20px 20px;
-  background: rgba(255, 255, 255, 0.95);
-  backdrop-filter: blur(20px);
-  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+  line-height: 1.6;
+  padding: 12px 16px 12px 16px;
+  background: transparent !important;
+  box-shadow: none !important;
+  resize: none;
+  min-height: 120px;
 }
 
 .prompt-input:focus {
-  background: rgba(255, 255, 255, 1);
-  box-shadow: 0 15px 50px rgba(0, 0, 0, 0.3);
-  transform: translateY(-2px);
+  box-shadow: none !important;
 }
 
 .input-actions {
   position: absolute;
-  bottom: 12px;
-  right: 12px;
+  bottom: 16px;
+  right: 16px;
   display: flex;
-  gap: 8px;
   align-items: center;
+  gap: 12px;
+  z-index: 2;
+}
+
+.send-btn {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: all 0.3s ease;
+}
+
+.send-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.send-btn:disabled {
+  background: #cbd5e1;
+  color: #94a3b8;
+  box-shadow: none;
+  cursor: not-allowed;
+}
+
+/* Glow effect behind the input */
+.input-glow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(59, 130, 246, 0.3) 0%,
+    rgba(139, 92, 246, 0.3) 50%,
+    rgba(16, 185, 129, 0.3) 100%
+  );
+  filter: blur(60px);
+  border-radius: 30px;
+  z-index: -1;
+  opacity: 0.5;
+  transition: opacity 0.3s ease;
+}
+
+.input-wrapper:focus-within + .input-glow {
+  opacity: 0.8;
 }
 
 /* 快捷按钮 */
