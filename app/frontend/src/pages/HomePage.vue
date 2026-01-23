@@ -171,7 +171,7 @@ onMounted(() => {
         <div class="input-wrapper">
           <a-textarea
             v-model:value="userPrompt"
-            placeholder="描述你想创建的应用，例如：&#10;“帮我创建一个个人博客网站”&#10;“设计一个在线商城系统”"
+            placeholder="描述你想创建的应用"
             :rows="5"
             :maxlength="1000"
             class="prompt-input"
@@ -188,7 +188,7 @@ onMounted(() => {
               :disabled="!userPrompt.trim()"
             >
               <template #icon>
-                <SendOutlined />
+                <SendOutlined :style="{ fontSize: '20px' }" />
               </template>
             </a-button>
           </div>
@@ -469,41 +469,49 @@ onMounted(() => {
   margin: 0 auto 40px;
   max-width: 800px;
   z-index: 10;
+  padding: 0 20px;
 }
 
 .input-wrapper {
   position: relative;
   border-radius: 24px;
-  background: rgba(255, 255, 255, 0.8);
-  padding: 8px;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.6);
+  background: rgba(255, 255, 255, 0.95);
+  padding: 6px;
+  transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  border: 1px solid rgba(255, 255, 255, 0.8);
   box-shadow:
-    0 4px 6px -1px rgba(0, 0, 0, 0.1),
-    0 2px 4px -1px rgba(0, 0, 0, 0.06),
-    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+    0 4px 6px -1px rgba(0, 0, 0, 0.05),
+    0 2px 4px -1px rgba(0, 0, 0, 0.03),
+    0 0 0 1px rgba(226, 232, 240, 0.6) inset;
   backdrop-filter: blur(20px);
 }
 
 .input-wrapper:focus-within {
-  background: rgba(255, 255, 255, 0.95);
+  background: #ffffff;
+  border-color: rgba(59, 130, 246, 0.4);
   box-shadow:
-    0 20px 25px -5px rgba(0, 0, 0, 0.1),
-    0 10px 10px -5px rgba(0, 0, 0, 0.04),
-    0 0 0 2px rgba(59, 130, 246, 0.5);
+    0 20px 25px -5px rgba(59, 130, 246, 0.1),
+    0 10px 10px -5px rgba(59, 130, 246, 0.04),
+    0 0 0 4px rgba(59, 130, 246, 0.1);
   transform: translateY(-2px);
 }
 
 .prompt-input {
-  border-radius: 16px;
+  border-radius: 20px;
   border: none !important;
   font-size: 16px;
   line-height: 1.6;
-  padding: 12px 16px 12px 16px;
+  padding: 16px 20px 60px 20px;
   background: transparent !important;
   box-shadow: none !important;
   resize: none;
-  min-height: 120px;
+  min-height: 140px;
+  color: #1e293b;
+}
+
+.prompt-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
 }
 
 .prompt-input:focus {
@@ -512,37 +520,45 @@ onMounted(() => {
 
 .input-actions {
   position: absolute;
-  bottom: 16px;
-  right: 16px;
+  bottom: 12px;
+  right: 12px;
   display: flex;
   align-items: center;
   gap: 12px;
   z-index: 2;
+  padding: 4px;
+  background: rgba(248, 250, 252, 0.8);
+  border-radius: 32px;
+  border: 1px solid rgba(226, 232, 240, 0.6);
 }
 
 .send-btn {
-  width: 48px;
-  height: 48px;
+  width: 40px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: #1e293b;
+  color: white;
   border: none;
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-  transition: all 0.3s ease;
+  border-radius: 50%;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
 }
 
 .send-btn:hover:not(:disabled) {
   transform: scale(1.05);
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+  background: #0f172a;
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
 }
 
 .send-btn:disabled {
-  background: #cbd5e1;
+  background: #e2e8f0;
   color: #94a3b8;
   box-shadow: none;
   cursor: not-allowed;
+  transform: none;
 }
 
 /* Glow effect behind the input */
@@ -551,23 +567,26 @@ onMounted(() => {
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 100%;
-  height: 100%;
+  width: 90%;
+  height: 90%;
   background: linear-gradient(
-    90deg,
-    rgba(59, 130, 246, 0.3) 0%,
-    rgba(139, 92, 246, 0.3) 50%,
-    rgba(16, 185, 129, 0.3) 100%
+    135deg,
+    rgba(59, 130, 246, 0.4) 0%,
+    rgba(147, 51, 234, 0.4) 50%,
+    rgba(236, 72, 153, 0.4) 100%
   );
   filter: blur(60px);
-  border-radius: 30px;
+  border-radius: 40px;
   z-index: -1;
-  opacity: 0.5;
-  transition: opacity 0.3s ease;
+  opacity: 0.3;
+  transition: opacity 0.5s ease;
 }
 
 .input-wrapper:focus-within + .input-glow {
-  opacity: 0.8;
+  opacity: 0.6;
+  width: 100%;
+  height: 100%;
+  filter: blur(80px);
 }
 
 /* 快捷按钮 */
@@ -580,39 +599,31 @@ onMounted(() => {
 }
 
 .quick-actions .ant-btn {
-  border-radius: 25px;
-  padding: 8px 20px;
-  height: auto;
-  background: rgba(255, 255, 255, 0.8);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  color: #475569;
-  backdrop-filter: blur(15px);
-  transition: all 0.3s;
-  position: relative;
+  border-radius: 100px;
+  padding: 0 24px;
+  height: 40px;
+  font-size: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  color: #64748b;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: center;
+  transition: all 0.3s ease;
   overflow: hidden;
 }
 
-.quick-actions .ant-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(59, 130, 246, 0.1), transparent);
-  transition: left 0.5s;
-}
-
-.quick-actions .ant-btn:hover::before {
-  left: 100%;
-}
-
 .quick-actions .ant-btn:hover {
-  background: rgba(255, 255, 255, 0.9);
-  border-color: rgba(59, 130, 246, 0.4);
-  color: #3b82f6;
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #334155;
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(59, 130, 246, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.quick-actions .ant-btn::before {
+  display: none;
 }
 
 /* 区域标题 */
