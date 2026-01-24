@@ -2,6 +2,7 @@ package tools
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -21,7 +22,14 @@ type WriteFileResult struct {
 }
 
 func WriteFileFunc(ctx context.Context, params *WriteFileParams) (WriteFileResult, error) {
-	projectPath := filepath.Join(conf.GetConf().ShareDir.ShareDir, ctx.Value(lutils.ProjectRootPath).(string))
+	val := ctx.Value(lutils.ProjectRootPath)
+	if val == nil {
+		return WriteFileResult{
+			Ok:    false,
+			Error: "ProjectRootPath is missing in context",
+		}, nil
+	}
+	projectPath := filepath.Join(conf.GetConf().ShareDir.ShareDir, val.(string))
 	target := filepath.Join(projectPath, params.Path)
 	if !IsSubPathAbs(target, projectPath, false) {
 		return WriteFileResult{
@@ -29,6 +37,14 @@ func WriteFileFunc(ctx context.Context, params *WriteFileParams) (WriteFileResul
 			Error: "路径不合法",
 		}, nil
 	}
+	dir := filepath.Dir(target)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return WriteFileResult{
+			Ok:    false,
+			Error: fmt.Sprintf("failed to create directory: %v", err),
+		}, nil
+	}
+
 	err := os.WriteFile(target, []byte(params.Content), 0644)
 	if err != nil {
 		return WriteFileResult{

@@ -23,4 +23,4 @@ redis:
   password: ""
   db: 0
 ShareDir:
-  share_dir: /static/project/
+  share_dir: /root/Projects/ai-code/app/ai/static/project/

@@ -59,6 +59,7 @@ func newFakeChatStream() *fakeChatStream {
 func (f *fakeChatStream) Context() context.Context { return f.ctx }
 
 func (f *fakeChatStream) Send(resp *ai.AiResp) error {
+	fmt.Println(resp)
 	return nil
 }
 func (f *fakeChatStream) Close() error {
@@ -75,9 +76,9 @@ func TestChat_Run(t *testing.T) {
 	target := filepath.Clean(filepath.Join(baseDir, "../../"))
 	godotenv.Load()
 	req := &ai.AiReq{
-		ProjectId: "7",
+		ProjectId: "demo",
 		History: []*ai.HistoryItem{
-			{Role: "user", Question: `生成一个hello world网页，点击文字改变文字颜色`},
+			{Role: "user", Question: `测试，生成一个hello world网页，只要这个文字就行`},
 		},
 	}
 	_ = os.Chdir(target)

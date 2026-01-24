@@ -5,7 +5,7 @@ import (
 	"io"
 	"os"
 
-	"github.com/MoScenix/ai-code/app/ai/chat"
+	lagent "github.com/MoScenix/ai-code/app/ai/agent"
 	"github.com/MoScenix/ai-code/app/ai/utils"
 	ai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
 	"github.com/cloudwego/eino/schema"
@@ -29,9 +29,9 @@ func Reverse[T any](s []T) {
 func (s *ChatService) Run(req *ai.AiReq, stream ai.AiService_ChatServer) (err error) {
 	Reverse(req.History)
 	s.ctx = context.WithValue(s.ctx, utils.ProjectRootPath, req.ProjectId)
-	agent := chat.NewAiAgent(s.ctx)
+	agent := lagent.NewHost(s.ctx)
 	var messages []*schema.Message
-	prompt, err := os.ReadFile("prompt/HTML-Prompt.txt")
+	prompt, err := os.ReadFile("prompt/host/host.txt")
 	if err != nil {
 		return err
 	}

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -41,7 +40,6 @@ func (h *UpdateUserService) Run(req *user.UserUpdateRequest) (resp *user.BaseRes
 		os.MkdirAll(filepath.Dir(req.UserAvatar), os.ModePerm)
 		h.RequestContext.SaveUploadedFile(avatar, req.UserAvatar)
 	}
-	fmt.Println(req)
 	_, err = rpc.UserClient.Update(h.Context, &rpcuser.UpdateReq{
 		Id:          req.Id,
 		UserName:    req.UserName,
