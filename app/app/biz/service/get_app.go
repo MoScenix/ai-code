@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/app/biz/model"
 	app "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 )
@@ -18,7 +19,7 @@ func NewGetAppService(ctx context.Context) *GetAppService {
 // Run create note info
 func (s *GetAppService) Run(req *app.GetAppReq) (resp *app.GetAppResp, err error) {
 	// Finish your business logic.
-	res, err := model.NewAppQuery(s.ctx, mysql.DB).GetAppById(uint(req.Id))
+	res, err := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient).GetAppById(uint(req.Id))
 	if err != nil {
 		return nil, err
 	}

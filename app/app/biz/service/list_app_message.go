@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/app/biz/model"
 	app "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 )
@@ -31,7 +32,7 @@ func (s *ListAppMessageService) Run(req *app.ListAppMessageReq) (resp *app.ListA
 	if err != nil {
 		return nil, err
 	}
-	Appres, err := model.NewAppQuery(s.ctx, mysql.DB).GetAppById(uint(req.AppId))
+	Appres, err := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient).GetAppById(uint(req.AppId))
 	if err != nil {
 		return nil, err
 	}

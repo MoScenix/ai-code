@@ -167,15 +167,11 @@ func DownloadAppCode(ctx context.Context, c *app.RequestContext) {
 		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
 		return
 	}
-
-	resp := &lapp.BaseResponseBytes{}
-	resp, err = service.NewDownloadAppCodeService(ctx, c).Run(&req)
+	_, err = service.NewDownloadAppCodeService(ctx, c).Run(&req)
 	if err != nil {
 		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
 		return
 	}
-
-	c.Data(200, "application/zip", resp.Data)
 }
 
 // DeleteAppByAdmin .

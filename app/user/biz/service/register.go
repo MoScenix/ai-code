@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/user/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/user/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/user/biz/model"
 	user "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
 	"github.com/google/uuid"
@@ -20,7 +21,7 @@ func NewRegisterService(ctx context.Context) *RegisterService {
 // Run create note info
 func (s *RegisterService) Run(req *user.RegisterReq) (resp *user.RegisterResp, err error) {
 	// Finish your business logic.
-	q := model.NewUserQuery(s.ctx, mysql.DB)
+	q := model.NewUserProQuery(s.ctx, mysql.DB, redis.RedisClient)
 	PasswordHashed, err := bcrypt.GenerateFromPassword([]byte(req.UserPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err

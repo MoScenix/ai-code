@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/user/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/user/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/user/biz/model"
 	user "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
 )
@@ -18,7 +19,7 @@ func NewListUserService(ctx context.Context) *ListUserService {
 // Run create note info
 func (s *ListUserService) Run(req *user.ListUserReq) (resp *user.ListUserResp, err error) {
 	// Finish your business logic.
-	q := model.NewUserQuery(s.ctx, mysql.DB)
+	q := model.NewUserProQuery(s.ctx, mysql.DB, redis.RedisClient)
 	res, err := q.ListUser(uint32(req.PageNum), req.UserName, req.Account, uint32(req.PageSize))
 	if err != nil {
 		return nil, err

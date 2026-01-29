@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/app/biz/model"
 	"github.com/MoScenix/ai-code/app/app/conf"
 	app "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
@@ -23,7 +24,7 @@ func NewAddAppService(ctx context.Context) *AddAppService {
 func (s *AddAppService) Run(req *app.AddAppReq) (resp *app.AddAppResp, err error) {
 	// Finish your business logic.
 	rs := []rune(req.InitPrompt)
-	res, err := model.NewAppQuery(s.ctx, mysql.DB).CreateApp(model.App{
+	res, err := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient).CreateApp(model.App{
 		Name:       string(rs[:min(len(rs), 12)]),
 		InitPrompt: req.InitPrompt,
 		UserId:     uint(req.UserId),

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/user/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/user/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/user/biz/model"
 	user "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
 )
@@ -18,7 +19,7 @@ func NewGetUserService(ctx context.Context) *GetUserService {
 // Run create note info
 func (s *GetUserService) Run(req *user.GetUserReq) (resp *user.GetUserResp, err error) {
 	// Finish your business logic.
-	q := model.NewUserQuery(s.ctx, mysql.DB)
+	q := model.NewUserProQuery(s.ctx, mysql.DB, redis.RedisClient)
 	User, err := q.GetUserById(int(req.Id))
 	if err != nil {
 		return nil, err

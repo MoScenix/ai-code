@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/app/biz/model"
 	app "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 )
@@ -19,7 +20,7 @@ func NewUpdateAppService(ctx context.Context) *UpdateAppService {
 // Run create note info
 func (s *UpdateAppService) Run(req *app.UpdateAppReq) (resp *app.UpdateAppResp, err error) {
 	// Finish your business logic.
-	q := model.NewAppQuery(s.ctx, mysql.DB)
+	q := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient)
 	up := model.App{
 		Name:     req.AppName,
 		Cover:    req.Cover,

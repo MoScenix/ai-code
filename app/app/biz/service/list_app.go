@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/app/biz/model"
 	app "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 )
@@ -18,7 +19,7 @@ func NewListAppService(ctx context.Context) *ListAppService {
 // Run create note info
 func (s *ListAppService) Run(req *app.ListAppReq) (resp *app.ListAppResp, err error) {
 	// Finish your business logic.
-	q := model.NewAppQuery(s.ctx, mysql.DB)
+	q := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient)
 	res, err := q.ListApp(uint32(req.PageNum), uint(req.UserId), req.AppName, uint32(req.PageSize))
 	if err != nil {
 		return nil, err

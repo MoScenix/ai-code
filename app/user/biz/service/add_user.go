@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/user/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/user/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/user/biz/model"
 	user "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
 	"golang.org/x/crypto/bcrypt"
@@ -19,7 +20,7 @@ func NewAddUserService(ctx context.Context) *AddUserService {
 // Run create note info
 func (s *AddUserService) Run(req *user.AddUserReq) (resp *user.AddUserResp, err error) {
 	// Finish your business logic.
-	q := model.NewUserQuery(s.ctx, mysql.DB)
+	q := model.NewUserProQuery(s.ctx, mysql.DB, redis.RedisClient)
 	PasswordHashed, err := bcrypt.GenerateFromPassword([]byte(req.UserPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err

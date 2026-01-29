@@ -2,7 +2,7 @@ FROM node:20-alpine AS builder
 WORKDIR /work
 RUN npm config set registry https://registry.npmmirror.com
 COPY app/frontend/package*.json ./app/frontend/
-RUN cd app/frontend && npm ci
+RUN cd app/frontend && npm install
 COPY app/frontend ./app/frontend
 RUN cd app/frontend && npm run build
 FROM nginx:1.27-alpine

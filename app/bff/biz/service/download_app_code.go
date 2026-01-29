@@ -2,7 +2,6 @@ package service
 
 import (
 	"archive/zip"
-	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -28,8 +27,8 @@ func (h *DownloadAppCodeService) Run(req *lapp.DownloadAppCodeRequest) (resp *la
 	if _, err = os.Stat(appDir); err != nil {
 		return nil, errors.New("app code not found")
 	}
-	var buf bytes.Buffer
-	zipWriter := zip.NewWriter(&buf)
+	h.RequestContext.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="app-%d.zip"`, req.AppId))
+	zipWriter := zip.NewWriter(h.RequestContext)
 
 	err = filepath.Walk(appDir, func(path string, info os.FileInfo, walkErr error) error {
 		if walkErr != nil {
@@ -74,11 +73,6 @@ func (h *DownloadAppCodeService) Run(req *lapp.DownloadAppCodeRequest) (resp *la
 
 	if err = zipWriter.Close(); err != nil {
 		return nil, err
-	}
-	resp = &lapp.BaseResponseBytes{
-		Code:    0,
-		Message: "success",
-		Data:    buf.Bytes(),
 	}
 	return resp, nil
 }

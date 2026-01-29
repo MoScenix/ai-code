@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/user/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/user/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/user/biz/model"
 	user "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
 )
@@ -18,7 +19,7 @@ func NewUpdateService(ctx context.Context) *UpdateService {
 // Run create note info
 func (s *UpdateService) Run(req *user.UpdateReq) (resp *user.UpdateResp, err error) {
 	// Finish your business logic.
-	err = model.NewUserQuery(s.ctx, mysql.DB).UpdateUser(uint(req.Id), model.User{
+	err = model.NewUserProQuery(s.ctx, mysql.DB, redis.RedisClient).UpdateUser(uint(req.Id), model.User{
 		UserAvatar:  req.UserAvatar,
 		Name:        req.UserName,
 		UserProfile: req.UserProfile,
