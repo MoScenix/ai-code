@@ -18,7 +18,9 @@ func NewGetAppService(ctx context.Context) *GetAppService {
 
 // Run create note info
 func (s *GetAppService) Run(req *app.GetAppReq) (resp *app.GetAppResp, err error) {
-	// Finish your business logic.
+	if mysql.DB == nil {
+		return nil, errDBNotReady
+	}
 	res, err := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient).GetAppById(uint(req.Id))
 	if err != nil {
 		return nil, err

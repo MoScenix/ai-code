@@ -18,7 +18,9 @@ func NewListAppService(ctx context.Context) *ListAppService {
 
 // Run create note info
 func (s *ListAppService) Run(req *app.ListAppReq) (resp *app.ListAppResp, err error) {
-	// Finish your business logic.
+	if mysql.DB == nil {
+		return nil, errDBNotReady
+	}
 	q := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient)
 	res, err := q.ListApp(uint32(req.PageNum), uint(req.UserId), req.AppName, uint32(req.PageSize))
 	if err != nil {

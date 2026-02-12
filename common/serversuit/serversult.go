@@ -20,6 +20,7 @@ func (s *CommonServerSuilt) Options() []server.Option {
 			ServiceName: s.ServerName,
 		}),
 		server.WithMetaHandler(transmeta.ServerHTTP2Handler),
+		server.WithMetaHandler(transmeta.MetainfoServerHandler),
 		server.WithTracer(
 			prometheus.NewServerTracer("", "", prometheus.WithDisableServer(true), prometheus.WithRegistry(mtl.Registry)),
 		),

@@ -19,7 +19,9 @@ func NewListAppMessageService(ctx context.Context) *ListAppMessageService {
 
 // Run create note info
 func (s *ListAppMessageService) Run(req *app.ListAppMessageReq) (resp *app.ListAppMessageResp, err error) {
-	// Finish your business logic.
+	if mysql.DB == nil {
+		return nil, errDBNotReady
+	}
 	q := model.NewMessageQuery(s.ctx, mysql.DB)
 	tot, err := q.Count(uint(req.AppId))
 	if err != nil {
@@ -37,6 +39,9 @@ func (s *ListAppMessageService) Run(req *app.ListAppMessageReq) (resp *app.ListA
 		return nil, err
 	}
 	res, err := q.ListMessagesByAppId(uint(req.AppId), int(req.PageSize), &t)
+	if err != nil {
+		return nil, err
+	}
 	for _, v := range res {
 		resp.MessageList = append(resp.MessageList, &app.AppMessage{
 			Id:         int64(v.ID),

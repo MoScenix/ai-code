@@ -18,8 +18,19 @@ func NewDeleteAppService(ctx context.Context) *DeleteAppService {
 
 // Run create note info
 func (s *DeleteAppService) Run(req *app.DeleteAppReq) (resp *app.DeleteAppResp, err error) {
-	// Finish your business logic.
-	err = model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient).DeleteApp(uint(req.Id))
+	op, err := getOperator(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+	q := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient)
+	appInfo, err := q.GetAppById(uint(req.Id))
+	if err != nil {
+		return nil, err
+	}
+	if err = mustOwnerOrAdmin(op, appInfo.UserId); err != nil {
+		return nil, err
+	}
+	err = q.DeleteApp(uint(req.Id))
 	if err != nil {
 		return nil, err
 	}

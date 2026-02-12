@@ -22,7 +22,16 @@ func NewAddAppService(ctx context.Context) *AddAppService {
 
 // Run create note info
 func (s *AddAppService) Run(req *app.AddAppReq) (resp *app.AddAppResp, err error) {
-	// Finish your business logic.
+	op, err := getOperator(s.ctx)
+	if err != nil {
+		return nil, err
+	}
+	if req.UserId != 0 && !op.isAdmin() && uint(req.UserId) != op.userID {
+		return nil, errForbidden
+	}
+	if req.UserId == 0 || !op.isAdmin() {
+		req.UserId = int64(op.userID)
+	}
 	rs := []rune(req.InitPrompt)
 	res, err := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient).CreateApp(model.App{
 		Name:       string(rs[:min(len(rs), 12)]),
@@ -30,6 +39,9 @@ func (s *AddAppService) Run(req *app.AddAppReq) (resp *app.AddAppResp, err error
 		UserId:     uint(req.UserId),
 		Priority:   1,
 	})
+	if err != nil {
+		return nil, err
+	}
 	path := filepath.Join(conf.GetConf().ShareDir.ShareDir, strconv.FormatInt(int64(res.ID), 10))
 	err = os.MkdirAll(path, os.ModePerm)
 	if err != nil {

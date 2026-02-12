@@ -19,8 +19,18 @@ func NewUpdateAppService(ctx context.Context) *UpdateAppService {
 
 // Run create note info
 func (s *UpdateAppService) Run(req *app.UpdateAppReq) (resp *app.UpdateAppResp, err error) {
-	// Finish your business logic.
+	op, err := getOperator(s.ctx)
+	if err != nil {
+		return nil, err
+	}
 	q := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient)
+	appInfo, err := q.GetAppById(uint(req.Id))
+	if err != nil {
+		return nil, err
+	}
+	if err = mustOwnerOrAdmin(op, appInfo.UserId); err != nil {
+		return nil, err
+	}
 	up := model.App{
 		Name:     req.AppName,
 		Cover:    req.Cover,
