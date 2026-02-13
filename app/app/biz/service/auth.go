@@ -5,6 +5,9 @@ import (
 	"errors"
 	"strconv"
 
+	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
+	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
+	"github.com/MoScenix/ai-code/app/app/biz/model"
 	"github.com/bytedance/gopkg/cloud/metainfo"
 )
 
@@ -50,4 +53,24 @@ func mustOwnerOrAdmin(op operator, ownerID uint) error {
 		return nil
 	}
 	return errForbidden
+}
+
+func requireOperator(ctx context.Context) (operator, error) {
+	return getOperator(ctx)
+}
+
+func requireAppOwnerOrAdmin(ctx context.Context, appID uint) (operator, model.App, error) {
+	op, err := getOperator(ctx)
+	if err != nil {
+		return operator{}, model.App{}, err
+	}
+	q := model.NewAppProQuery(ctx, mysql.DB, redis.RedisClient)
+	appInfo, err := q.GetAppById(appID)
+	if err != nil {
+		return operator{}, model.App{}, err
+	}
+	if err = mustOwnerOrAdmin(op, appInfo.UserId); err != nil {
+		return operator{}, model.App{}, err
+	}
+	return op, appInfo, nil
 }

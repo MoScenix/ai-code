@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
-	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/app/biz/model"
 	app "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 )
@@ -18,19 +17,15 @@ func NewAddMessageService(ctx context.Context) *AddMessageService {
 
 // Run create note info
 func (s *AddMessageService) Run(req *app.AddMessageReq) (resp *app.AddMessageResp, err error) {
-	op, err := getOperator(s.ctx)
+	if mysql.DB == nil {
+		return nil, errDBNotReady
+	}
+	op, _, err := requireAppOwnerOrAdmin(s.ctx, uint(req.AppId))
 	if err != nil {
 		return nil, err
 	}
 	if req.UserId != 0 && !op.isAdmin() && uint(req.UserId) != op.userID {
 		return nil, errForbidden
-	}
-	appInfo, err := model.NewAppProQuery(s.ctx, mysql.DB, redis.RedisClient).GetAppById(uint(req.AppId))
-	if err != nil {
-		return nil, err
-	}
-	if err = mustOwnerOrAdmin(op, appInfo.UserId); err != nil {
-		return nil, err
 	}
 	res, err := model.NewMessageQuery(s.ctx, mysql.DB).CreateMessage(model.Message{
 		AppId:   uint(req.AppId),

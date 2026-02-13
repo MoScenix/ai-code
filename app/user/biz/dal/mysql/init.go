@@ -1,11 +1,14 @@
 package mysql
 
 import (
+	"context"
+	"errors"
 	"fmt"
 	"os"
 
 	"github.com/MoScenix/ai-code/app/user/biz/model"
 	"github.com/MoScenix/ai-code/app/user/conf"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -30,4 +33,30 @@ func Init() {
 	if err != nil {
 		panic(err)
 	}
+	if err := ensureDefaultAdmin(); err != nil {
+		panic(err)
+	}
+}
+
+func ensureDefaultAdmin() error {
+	ctx := context.Background()
+	q := model.NewUserQuery(ctx, DB)
+	_, err := q.GetUserByAccount("root")
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return err
+	}
+	hashed, err := bcrypt.GenerateFromPassword([]byte("rootroot"), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	_, err = q.CreateUser(model.User{
+		UserAccount:  "root",
+		Name:         "root",
+		UserRole:     "admin",
+		PasswordHash: string(hashed),
+	})
+	return err
 }

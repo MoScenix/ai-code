@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"errors"
 
+	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
 	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
 	rpcapp "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
@@ -20,6 +22,16 @@ func NewListMyAppVOByPageService(Context context.Context, RequestContext *app.Re
 }
 
 func (h *ListMyAppVOByPageService) Run(req *lapp.AppQueryRequest) (resp *lapp.BaseResponsePageAppVO, err error) {
+	if req.UserId == 0 {
+		userID, err := parseUserID(h.Context.Value(utils.UserIdKey))
+		if err != nil {
+			return &lapp.BaseResponsePageAppVO{
+				Code:    1,
+				Message: err.Error(),
+			}, err
+		}
+		req.UserId = userID
+	}
 	res, err := rpc.AppClient.ListApp(h.Context, &rpcapp.ListAppReq{
 		PageNum:  req.PageNum,
 		PageSize: req.PageSize,
@@ -77,3 +89,15 @@ func (h *ListMyAppVOByPageService) Run(req *lapp.AppQueryRequest) (resp *lapp.Ba
 	}
 	return resp, nil
 }
+
+func parseUserID(v interface{}) (int64, error) {
+	switch value := v.(type) {
+	case float64:
+		if value > 0 {
+			return int64(value), nil
+		}
+	}
+	return 0, errors.New("unauthorized: missing user id")
+}
+
+// parseUserRole removed: not needed for list-my filtering

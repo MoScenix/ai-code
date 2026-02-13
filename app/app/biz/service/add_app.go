@@ -22,6 +22,9 @@ func NewAddAppService(ctx context.Context) *AddAppService {
 
 // Run create note info
 func (s *AddAppService) Run(req *app.AddAppReq) (resp *app.AddAppResp, err error) {
+	if mysql.DB == nil {
+		return nil, errDBNotReady
+	}
 	op, err := getOperator(s.ctx)
 	if err != nil {
 		return nil, err
