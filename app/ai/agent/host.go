@@ -2,40 +2,20 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"log"
-	"os"
 	"strings"
 
-	"github.com/cloudwego/eino-ext/components/model/qwen"
+	"github.com/MoScenix/ai-code/app/ai/llm"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
 )
 
-func of[T any](t T) *T {
-	return &t
-}
-func NewChatModel() (*qwen.ChatModel, error) {
-	ctx := context.Background()
-	apiKey := os.Getenv("DASHSCOPE_API_KEY")
-	modelName := os.Getenv("MODEL_NAME")
-	cm, err := qwen.NewChatModel(ctx, &qwen.ChatModelConfig{
-		BaseURL:     "https://dashscope.aliyuncs.com/compatible-mode/v1",
-		APIKey:      apiKey,
-		Timeout:     0,
-		Model:       modelName,
-		MaxTokens:   of(2048),
-		Temperature: of(float32(0.7)),
-		TopP:        of(float32(0.7)),
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return cm, err
-}
 func NewHost(ctx context.Context) *react.Agent {
-	cm, err := NewChatModel()
+	fmt.Printf("[ai-agent] host init\n")
+	cm, err := llm.NewChatModel(context.Background())
 	if err != nil {
 		return nil
 	}
@@ -51,6 +31,7 @@ func NewHost(ctx context.Context) *react.Agent {
 			specialists = append(specialists, specialist)
 		}
 	}
+	fmt.Printf("[ai-agent] host ready specialists=%d\n", len(specialists))
 	AllTools := compose.ToolsNodeConfig{
 		Tools: specialists,
 	}
@@ -58,7 +39,7 @@ func NewHost(ctx context.Context) *react.Agent {
 		ToolCallingModel: cm,
 		ToolsConfig:      AllTools,
 		//StreamToolCallChecker: toolCallChecker,
-		MaxStep: 50,
+		MaxStep: 12,
 	})
 	if err != nil {
 		log.Fatal(err)

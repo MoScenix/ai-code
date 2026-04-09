@@ -24,3 +24,12 @@
 sh build.sh
 sh output/bootstrap.sh
 ```
+
+## Auth matrix
+
+- Need auth: `AddApp`, `UpdateApp`, `DeleteApp`, `AddMessage`, `DeleteMessage`
+- No auth required: `GetApp`, `ListApp`, `ListAppMessage`
+
+Notes:
+- Write operations require operator identity from RPC metainfo (`x-user-id`, `x-user-role`).
+- Read operations are public in app service, and do not require identity.

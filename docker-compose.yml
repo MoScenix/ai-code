@@ -77,6 +77,8 @@ services:
     build:
       context: .
       dockerfile: docker_files/DockerFile.ai
+    env_file:
+      - ./app/ai/.env
     ports:
       - "8889:8888"
     volumes:
@@ -88,8 +90,8 @@ services:
       - MYSQL_PASSWORD=YOUR_PASSWORD
       - MYSQL_DATABASE=YOU_DB
       - MYSQL_HOST=mysql
-      - MODEL_NAME=
-      - DASHSCOPE_API_KEY=
+      # - MODEL_NAME=
+      # - DASHSCOPE_API_KEY=
     depends_on:
       consul:
         condition: service_healthy
@@ -98,7 +100,6 @@ services:
       redis:
         condition: service_healthy
   app:
-    # image: app-user:dev
     build:
       context: .
       dockerfile: docker_files/DockerFile.app

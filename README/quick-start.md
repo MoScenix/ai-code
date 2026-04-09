@@ -12,7 +12,7 @@
 
 ## 启动步骤
 
-首先配置**docker-compose.yml**文件的**ai**service的**environment**参数**MODEL_NAME**和**DASHSCOPE_API_KEY**，并保存。
+首先配置 `app/ai/.env` 文件中的 `MODEL_NAME` 和 `DASHSCOPE_API_KEY`，并保存。`ai` 服务会在运行时通过 `env_file` 读取这两个配置。
 
 ```bash
 # 1. 克隆仓库
@@ -20,7 +20,7 @@ git clone https://github.com/MoScenix/ai-code.git
 cd ai-code
 
 # 2. 启动所有服务
-docker compose up -d
+docker compose up -d --build
 
 # 3. 查看服务状态
 

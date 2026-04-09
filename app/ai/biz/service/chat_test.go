@@ -78,7 +78,7 @@ func TestChat_Run(t *testing.T) {
 	req := &ai.AiReq{
 		ProjectId: "demo",
 		History: []*ai.HistoryItem{
-			{Role: "user", Question: `测试，生成一个hello world网页，只要这个文字就行`},
+			{Role: "user", Question: `测试，写一个upcpc竞赛宣传网页`},
 		},
 	}
 	_ = os.Chdir(target)

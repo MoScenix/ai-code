@@ -5,39 +5,17 @@ import (
 	"errors"
 	"io"
 	"log"
-	"os"
 
+	"github.com/MoScenix/ai-code/app/ai/llm"
 	"github.com/MoScenix/ai-code/app/ai/tools"
-	"github.com/cloudwego/eino-ext/components/model/qwen"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/flow/agent/react"
 	"github.com/cloudwego/eino/schema"
 )
 
-func of[T any](t T) *T {
-	return &t
-}
-func NewChatModel() (*qwen.ChatModel, error) {
-	ctx := context.Background()
-	apiKey := os.Getenv("DASHSCOPE_API_KEY")
-	modelName := os.Getenv("MODEL_NAME")
-	cm, err := qwen.NewChatModel(ctx, &qwen.ChatModelConfig{
-		BaseURL:     "https://dashscope.aliyuncs.com/compatible-mode/v1",
-		APIKey:      apiKey,
-		Timeout:     0,
-		Model:       modelName,
-		MaxTokens:   of(2048),
-		Temperature: of(float32(0.7)),
-		TopP:        of(float32(0.7)),
-	})
-	if err != nil {
-		log.Fatal(err)
-	}
-	return cm, err
-}
 func NewAiAgent(ctx context.Context) *react.Agent {
-	cm, err := NewChatModel()
+	cm, err := llm.NewChatModel(context.Background())
 	if err != nil {
 		return nil
 	}
@@ -46,27 +24,27 @@ func NewAiAgent(ctx context.Context) *react.Agent {
 	if err != nil {
 		log.Fatal(err)
 	}
-	InvokableTools = append(InvokableTools, InvokableTool)
+	InvokableTools = append(InvokableTools, tools.WrapWithLogging("MkPath", InvokableTool))
 	InvokableTool, err = tools.NewWriteFileTool()
 	if err != nil {
 		log.Fatal(err)
 	}
-	InvokableTools = append(InvokableTools, InvokableTool)
+	InvokableTools = append(InvokableTools, tools.WrapWithLogging("WriteFile", InvokableTool))
 	InvokableTool, err = tools.NewViewFileTool()
 	if err != nil {
 		log.Fatal(err)
 	}
-	InvokableTools = append(InvokableTools, InvokableTool)
+	InvokableTools = append(InvokableTools, tools.WrapWithLogging("ViewFile", InvokableTool))
 	InvokableTool, err = tools.NewDeleteFileTool()
 	if err != nil {
 		log.Fatal(err)
 	}
-	InvokableTools = append(InvokableTools, InvokableTool)
+	InvokableTools = append(InvokableTools, tools.WrapWithLogging("DeleteFile", InvokableTool))
 	InvokableTool, err = tools.NewReadDirTool()
 	if err != nil {
 		log.Fatal(err)
 	}
-	InvokableTools = append(InvokableTools, InvokableTool)
+	InvokableTools = append(InvokableTools, tools.WrapWithLogging("ReadDir", InvokableTool))
 	var baseTools []tool.BaseTool
 	for _, t := range InvokableTools {
 		baseTools = append(baseTools, t)
