@@ -1,3 +1,5 @@
 **/tmp
 **/.env
 **/static
+.DS_Store
+.codex

@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/MoScenix/ai-code/app/bff/conf"
+	"github.com/MoScenix/ai-code/common/clientsuit"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai/aiservice"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app/appservice"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user/userservice"
@@ -14,7 +15,6 @@ import (
 	"github.com/cloudwego/kitex/client"
 	"github.com/cloudwego/kitex/pkg/endpoint"
 	"github.com/cloudwego/kitex/pkg/transmeta"
-	consul "github.com/kitex-contrib/registry-consul"
 )
 
 var (
@@ -40,51 +40,52 @@ func Init() {
 	once2.Do(initAiClient)
 }
 func initUserClient() {
-	r, err := consul.NewConsulResolver(conf.GetConf().Consul.Address)
-	if err != nil {
-		hlog.Fatal(err)
-	}
-
+	opts := newCommonClientOptions(false)
+	var err error
 	UserClient, err = userservice.NewClient(
 		"user",
-		client.WithResolver(r),
-		client.WithMetaHandler(transmeta.MetainfoClientHandler),
-		client.WithMiddleware(injectIdentityMetaMiddleware()),
+		opts...,
 	)
 	if err != nil {
 		hlog.Fatal(err)
 	}
 }
 func initAppClient() {
-	r, err := consul.NewConsulResolver(conf.GetConf().Consul.Address)
-	if err != nil {
-		hlog.Fatal(err)
-	}
-
+	opts := newCommonClientOptions(false)
+	var err error
 	AppClient, err = appservice.NewClient(
 		"app",
-		client.WithResolver(r),
-		client.WithMetaHandler(transmeta.MetainfoClientHandler),
-		client.WithMiddleware(injectIdentityMetaMiddleware()),
+		opts...,
 	)
 	if err != nil {
 		hlog.Fatal(err)
 	}
 }
 func initAiClient() {
-	r, err := consul.NewConsulResolver(conf.GetConf().Consul.Address)
-	if err != nil {
-		hlog.Fatal(err)
-	}
+	opts := newCommonClientOptions(true)
+	var err error
 	AiClient, err = aiservice.NewClient(
 		"ai",
-		client.WithResolver(r),
-		client.WithMetaHandler(transmeta.MetainfoClientHandler),
-		client.WithMiddleware(injectIdentityMetaMiddleware()),
+		opts...,
 	)
 	if err != nil {
 		hlog.Fatal(err)
 	}
+}
+
+func newCommonClientOptions(enableGRPC bool) []client.Option {
+	opts := clientsuit.CommonGrpcClientSuite{
+		CurrentServiceName: conf.GetConf().Hertz.Service,
+		RegistryAddr:       conf.GetConf().Consul.Address,
+		EnableGRPC:         enableGRPC,
+	}.Options()
+
+	opts = append(opts,
+		client.WithMetaHandler(transmeta.MetainfoClientHandler),
+		client.WithMiddleware(injectIdentityMetaMiddleware()),
+	)
+
+	return opts
 }
 
 func injectIdentityMetaMiddleware() endpoint.Middleware {

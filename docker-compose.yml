@@ -49,6 +49,12 @@ services:
       - GF_AUTH_DISABLE_LOGIN_FORM=true
     ports:
       - "3000:3000"
+  jaeger:
+    image: jaegertracing/jaeger:2.6.0
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
   user:
     # image: app-user:dev
     build:
@@ -65,7 +71,10 @@ services:
       - MYSQL_PASSWORD=YOUR_PASSWORD
       - MYSQL_DATABASE=YOU_DB
       - MYSQL_HOST=mysql
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     depends_on:
+      jaeger:
+        condition: service_started
       consul:
         condition: service_healthy
       mysql:
@@ -90,9 +99,12 @@ services:
       - MYSQL_PASSWORD=YOUR_PASSWORD
       - MYSQL_DATABASE=YOU_DB
       - MYSQL_HOST=mysql
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
       # - MODEL_NAME=
       # - DASHSCOPE_API_KEY=
     depends_on:
+      jaeger:
+        condition: service_started
       consul:
         condition: service_healthy
       mysql:
@@ -114,7 +126,10 @@ services:
       - MYSQL_PASSWORD=YOUR_PASSWORD
       - MYSQL_DATABASE=YOU_DB
       - MYSQL_HOST=mysql
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     depends_on:
+      jaeger:
+        condition: service_started
       consul:
         condition: service_healthy
       mysql:
@@ -130,9 +145,13 @@ services:
     environment:
       - GO_ENV=online
       - SESSION_SECRET=YOUR_SESSION_SECRET
+      - OTEL_EXPORTER_OTLP_ENDPOINT=jaeger:4317
     volumes:
       - deploy:/deploy
       - static:/static
+    depends_on:
+      jaeger:
+        condition: service_started
   frontend:
     build:
       dockerfile: docker_files/DockerFile.frontend

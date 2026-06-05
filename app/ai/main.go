@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"net"
 	"time"
 
@@ -19,6 +20,8 @@ import (
 
 func main() {
 	godotenv.Load()
+	tp := mtl.TraceInit(conf.GetConf().Kitex.Service)
+	defer tp.Shutdown(context.Background())
 	mtl.InitMetric(conf.GetConf().Kitex.Service, conf.GetConf().Kitex.MetricsPort, conf.GetConf().Registry.RegistryAddress[0])
 	opts := kitexInit()
 
