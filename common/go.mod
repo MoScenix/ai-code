@@ -8,6 +8,7 @@ require (
 	github.com/kitex-contrib/obs-opentelemetry v0.3.0
 	github.com/kitex-contrib/registry-consul v0.2.0
 	github.com/prometheus/client_golang v1.17.0
+	gopkg.in/yaml.v2 v2.4.0
 )
 
 require (
