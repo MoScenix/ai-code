@@ -15,5 +15,5 @@ type CacheStore interface {
 	Delete(ctx context.Context, key string) error
 	List(ctx context.Context, prefix string) ([]filestore.ObjectInfo, error)
 	Stat(ctx context.Context, key string) (filestore.ObjectInfo, error)
-	Flush(ctx context.Context) error
+	Flush(ctx context.Context, path string) error
 }

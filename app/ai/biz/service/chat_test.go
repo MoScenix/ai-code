@@ -2,15 +2,11 @@ package service
 
 import (
 	"context"
-	"fmt"
-	"os"
-	"path/filepath"
-	"runtime"
+	"errors"
 	"testing"
 
 	ai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
 	"github.com/cloudwego/kitex/pkg/remote/trans/nphttp2/metadata"
-	"github.com/joho/godotenv"
 )
 
 type fakeChatStream struct {
@@ -59,33 +55,25 @@ func newFakeChatStream() *fakeChatStream {
 func (f *fakeChatStream) Context() context.Context { return f.ctx }
 
 func (f *fakeChatStream) Send(resp *ai.AiResp) error {
-	fmt.Println(resp)
 	return nil
 }
 func (f *fakeChatStream) Close() error {
 	return nil
 }
 func (f *fakeChatStream) Recv() (*ai.AiReq, error) {
-	return nil, fmt.Errorf("Recv not implemented for testing")
+	return nil, ErrChatRuntimeUnavailable
 }
 
 func TestChat_Run(t *testing.T) {
-	// todo: edit your unit test
-	_, thisFile, _, _ := runtime.Caller(0)
-	baseDir := filepath.Dir(thisFile)
-	target := filepath.Clean(filepath.Join(baseDir, "../../"))
-	godotenv.Load()
 	req := &ai.AiReq{
 		ProjectId: "demo",
 		History: []*ai.HistoryItem{
 			{Role: "user", Question: `测试，写一个upcpc竞赛宣传网页`},
 		},
 	}
-	_ = os.Chdir(target)
-	godotenv.Load()
 	var a = fakeChatStream{}
 	err := NewChatService(context.Background()).Run(req, &a)
-	if err != nil {
-		fmt.Println(err)
+	if !errors.Is(err, ErrChatRuntimeUnavailable) {
+		t.Fatalf("expected ErrChatRuntimeUnavailable, got %v", err)
 	}
 }

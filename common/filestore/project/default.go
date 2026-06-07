@@ -105,7 +105,7 @@ func (s *ProjectStore) Stat(ctx context.Context, path string) (filestore.ObjectI
 }
 
 func (s *ProjectStore) Commit(ctx context.Context) error {
-	return s.files.Flush(ctx)
+	return s.files.Flush(ctx, s.projectID)
 }
 
 func (s *ProjectStore) key(path string, allowRoot bool) (string, error) {
