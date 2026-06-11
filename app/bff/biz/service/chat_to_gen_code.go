@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"io"
 	"strconv"
-	"time"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
@@ -38,26 +37,16 @@ func (h *ChatToGenCodeService) Run(req *lapp.ChatToGenCodeRequest) (resp *lapp.S
 	if err != nil {
 		return SendErr(w, err)
 	}
-	res, err := q.ListAppMessage(h.Context, &rpcapp.ListAppMessageReq{
-		AppId:          req.AppId,
-		PageSize:       20,
-		LastCreateTime: time.Now().Add(20 * time.Second).Format("2006-01-02 15:04:05"),
-	})
-	if err != nil {
-		return SendErr(w, err)
-	}
 	var Queryc = ai.AiReq{
 		ProjectId: strconv.FormatInt(req.AppId, 10),
 	}
-	for _, v := range res.MessageList {
-		Queryc.History = append(Queryc.History, &ai.HistoryItem{
-			Question: v.Content,
-			Role:     v.Role,
-		})
-	}
 	stream, err := rpc.AiClient.Chat(h.Context, &Queryc)
+	if err != nil {
+		return SendErr(w, err)
+	}
 	defer stream.Close()
-	var ans = ""
+
+	queued := false
 	for {
 		data, err := stream.Recv()
 		if err != nil {
@@ -66,19 +55,23 @@ func (h *ChatToGenCodeService) Run(req *lapp.ChatToGenCodeRequest) (resp *lapp.S
 			}
 			return SendErr(w, err)
 		}
-		Msg, err := json.Marshal(lapp.ServerSentEventString{
-			D: data.Answer,
-		})
-		w.WriteEvent("", "message", []byte(Msg))
-		ans += data.Answer
+		queued = data.GetAnswer() == "true"
 	}
-	w.WriteEvent("", "done", []byte("1"))
-	_, err = q.AddMessage(h.Context, &rpcapp.AddMessageReq{
-		AppId:   req.AppId,
-		UserId:  int64(h.Context.Value(utils.UserIdKey).(float64)),
-		Content: ans,
-		Role:    "assistant",
+	event := "queued"
+	message := "true"
+	if !queued {
+		event = "business-error"
+		message = "false"
+	}
+	Msg, err := json.Marshal(lapp.ServerSentEventString{
+		D:       message,
+		Message: message,
 	})
+	if err != nil {
+		return SendErr(w, err)
+	}
+	w.WriteEvent("", event, []byte(Msg))
+	w.WriteEvent("", "done", []byte("1"))
 	return &lapp.ServerSentEventString{
 		Message: "success",
 	}, nil

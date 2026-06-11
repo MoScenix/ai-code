@@ -29,6 +29,9 @@ gen-server: ## gen service code of {svc}. example: make gen-server svc=product
 .PHONY: gen-frontend
 gen-bff:
 	@cd app/bff && cwgo server -I ../../idl --type HTTP --service bff --module github.com/MoScenix/ai-code/app/bff --idl ../../idl/bff/app_bff.proto
+	@perl -0pi -e 's/json:"code,omitempty"/json:"code"/g' app/bff/hertz_gen/bff/app/app_bff.pb.go app/bff/hertz_gen/bff/user/user_bff.pb.go
+	@perl -0pi -e 's/var req app\.(AISubmitRequest|AIControlRequest|AIStateRequest|AIEventsRequest)/var req lapp.$$1/g' app/bff/biz/handler/app/app_service.go
+	@gofmt -w app/bff/hertz_gen/bff/app/app_bff.pb.go app/bff/hertz_gen/bff/user/user_bff.pb.go app/bff/biz/handler/app/app_service.go
 
 ##@ Build
 
@@ -88,4 +91,3 @@ open-jaeger: ## open `jaeger ui` in the default browser
 .PHONY: open.prometheus
 open-prometheus: ## open `prometheus ui` in the default browser
 	@open "http://localhost:9090"
-

@@ -24,6 +24,7 @@ type Config struct {
 	Redis    Redis    `yaml:"redis"`
 	Registry Registry `yaml:"registry"`
 	ShareDir ShareDir `yaml:"ShareDir"`
+	WorkPool WorkPool `yaml:"workpool"`
 }
 
 type MySQL struct {
@@ -57,6 +58,15 @@ type ShareDir struct {
 	ShareDir string `yaml:"share_dir"`
 }
 
+type WorkPool struct {
+	MinWorkers         int `yaml:"min_workers"`
+	MaxWorkers         int `yaml:"max_workers"`
+	QueueSize          int `yaml:"queue_size"`
+	ScaleUpThreshold   int `yaml:"scale_up_threshold"`
+	ScaleDownThreshold int `yaml:"scale_down_threshold"`
+	IdleTimeoutSeconds int `yaml:"idle_timeout_seconds"`
+}
+
 // GetConf gets configuration instance
 func GetConf() *Config {
 	once.Do(initConf)
@@ -64,9 +74,11 @@ func GetConf() *Config {
 }
 
 func initConf() {
-	prefix := "conf"
-	confFileRelPath := filepath.Join(prefix, filepath.Join(GetEnv(), "conf.yaml"))
-	content, err := ioutil.ReadFile(confFileRelPath)
+	confFilePath, err := findConfFile()
+	if err != nil {
+		panic(err)
+	}
+	content, err := ioutil.ReadFile(confFilePath)
 	if err != nil {
 		panic(err)
 	}
@@ -82,6 +94,33 @@ func initConf() {
 	}
 	conf.Env = GetEnv()
 	pretty.Printf("%+v\n", conf)
+}
+
+func findConfFile() (string, error) {
+	if p := os.Getenv("AI_CONF_PATH"); p != "" {
+		return p, nil
+	}
+
+	rel := filepath.Join("app", "ai", "conf", GetEnv(), "conf.yaml")
+	wd, err := os.Getwd()
+	if err != nil {
+		return "", err
+	}
+
+	for {
+		candidate := filepath.Join(wd, rel)
+		if _, err := os.Stat(candidate); err == nil {
+			return candidate, nil
+		}
+
+		parent := filepath.Dir(wd)
+		if parent == wd {
+			break
+		}
+		wd = parent
+	}
+
+	return filepath.Join("conf", GetEnv(), "conf.yaml"), nil
 }
 
 func GetEnv() string {

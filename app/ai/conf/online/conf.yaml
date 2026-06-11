@@ -24,3 +24,11 @@ redis:
   db: 0
 ShareDir:
   share_dir: /static/project/
+
+workpool:
+  min_workers: 1
+  max_workers: 4
+  queue_size: 128
+  scale_up_threshold: 4
+  scale_down_threshold: 0
+  idle_timeout_seconds: 30

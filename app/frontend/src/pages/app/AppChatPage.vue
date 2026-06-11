@@ -463,7 +463,7 @@ const sendMessage = async () => {
   await generateCode(msg, aiMessageIndex)
 }
 
-// 生成代码 - 使用 EventSource 处理流式响应
+// 提交 AI 任务 - 后续消息由刷新/事件读取链路同步
 const generateCode = async (userMessage: string, aiMessageIndex: number) => {
   let eventSource: EventSource | null = null
   let streamCompleted = false
@@ -485,28 +485,17 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       withCredentials: true,
     })
 
-    let fullContent = ''
-
-    // 处理接收到的消息
-    eventSource.onmessage = function (event) {
+    eventSource.addEventListener('queued', function () {
       if (streamCompleted) return
 
-      try {
-        // 解析JSON包装的数据
-        const parsed = JSON.parse(event.data)
-        const content = parsed.d
+      messages.value[aiMessageIndex].content = '任务已入队，AI 正在后台处理。'
+      messages.value[aiMessageIndex].loading = false
+      message.success('任务已提交')
+      scrollToBottom()
+    })
 
-        // 拼接内容
-        if (content !== undefined && content !== null) {
-          fullContent += content
-          messages.value[aiMessageIndex].content = fullContent
-          messages.value[aiMessageIndex].loading = false
-          scrollToBottom()
-        }
-      } catch (error) {
-        console.error('解析消息失败:', error)
-        handleError(error, aiMessageIndex)
-      }
+    eventSource.onmessage = function () {
+      // 当前接口只返回提交结果，AI 事件流后续由独立读取链路处理。
     }
 
     // 处理done事件
@@ -517,11 +506,8 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
       isGenerating.value = false
       eventSource?.close()
 
-      // 延迟更新预览，确保后端已完成处理
-      setTimeout(async () => {
-        await fetchAppInfo()
-        updatePreview()
-      }, 1000)
+      await fetchAppInfo()
+      updatePreview()
     })
 
     // 处理business-error事件（后端限流等错误）
@@ -556,10 +542,8 @@ const generateCode = async (userMessage: string, aiMessageIndex: number) => {
         isGenerating.value = false
         eventSource?.close()
 
-        setTimeout(async () => {
-          await fetchAppInfo()
-          updatePreview()
-        }, 1000)
+        await fetchAppInfo()
+        updatePreview()
       } else {
         handleError(new Error('SSE连接错误'), aiMessageIndex)
       }

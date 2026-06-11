@@ -40,6 +40,15 @@ func Register(r *server.Hertz) {
 			}
 		}
 		{
+			_ai := _app.Group("/ai", _aiMw()...)
+			_ai.POST("/answer", append(_answeraiMw(), app.AnswerAI)...)
+			_ai.POST("/cancel", append(_cancelaiMw(), app.CancelAI)...)
+			_ai.GET("/events", append(_listaieventsMw(), app.ListAIEvents)...)
+			_ai.POST("/push", append(_pushaiMw(), app.PushAI)...)
+			_ai.GET("/state", append(_getaistateMw(), app.GetAIState)...)
+			_ai.POST("/submit", append(_submitaiMw(), app.SubmitAI)...)
+		}
+		{
 			_chat := _app.Group("/chat", _chatMw()...)
 			{
 				_gen := _chat.Group("/gen", _genMw()...)

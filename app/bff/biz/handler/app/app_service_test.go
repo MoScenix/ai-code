@@ -232,3 +232,88 @@ func TestListAppChatHistory(t *testing.T) {
 	// assert.DeepEqual(t, 200, resp.StatusCode())
 	// assert.DeepEqual(t, "null", string(resp.Body()))
 }
+
+func TestSubmitAI(t *testing.T) {
+	h := server.Default()
+	h.POST("/app/ai/submit", SubmitAI)
+	path := "/app/ai/submit"                                  // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "POST", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+func TestPushAI(t *testing.T) {
+	h := server.Default()
+	h.POST("/app/ai/push", PushAI)
+	path := "/app/ai/push"                                    // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "POST", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+func TestAnswerAI(t *testing.T) {
+	h := server.Default()
+	h.POST("/app/ai/answer", AnswerAI)
+	path := "/app/ai/answer"                                  // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "POST", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+func TestCancelAI(t *testing.T) {
+	h := server.Default()
+	h.POST("/app/ai/cancel", CancelAI)
+	path := "/app/ai/cancel"                                  // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "POST", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+func TestGetAIState(t *testing.T) {
+	h := server.Default()
+	h.GET("/app/ai/state", GetAIState)
+	path := "/app/ai/state"                                   // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "GET", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}
+func TestListAIEvents(t *testing.T) {
+	h := server.Default()
+	h.GET("/app/ai/events", ListAIEvents)
+	path := "/app/ai/events"                                  // todo: you can customize query
+	body := &ut.Body{Body: bytes.NewBufferString(""), Len: 1} // todo: you can customize body
+	header := ut.Header{}                                     // todo: you can customize header
+	w := ut.PerformRequest(h.Engine, "GET", path, body, header)
+	resp := w.Result()
+	t.Log(string(resp.Body()))
+
+	// todo edit your unit test.
+	// assert.DeepEqual(t, 200, resp.StatusCode())
+	// assert.DeepEqual(t, "null", string(resp.Body()))
+}

@@ -5,4 +5,6 @@ use (
 	./app/app
 	./app/bff
 	./app/user
+	./common
+	./rpc_gen
 )

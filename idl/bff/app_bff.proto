@@ -45,6 +45,30 @@ service AppService {
     option (api.get) = "/app/chat/gen/code";
   }
 
+  rpc SubmitAI(AISubmitRequest) returns (BaseResponseBoolean) {
+    option (api.post) = "/app/ai/submit";
+  }
+
+  rpc PushAI(AIControlRequest) returns (BaseResponseString) {
+    option (api.post) = "/app/ai/push";
+  }
+
+  rpc AnswerAI(AIControlRequest) returns (BaseResponseBoolean) {
+    option (api.post) = "/app/ai/answer";
+  }
+
+  rpc CancelAI(AIControlRequest) returns (BaseResponseString) {
+    option (api.post) = "/app/ai/cancel";
+  }
+
+  rpc GetAIState(AIStateRequest) returns (BaseResponseAIState) {
+    option (api.get) = "/app/ai/state";
+  }
+
+  rpc ListAIEvents(AIEventsRequest) returns (BaseResponseAIEvents) {
+    option (api.get) = "/app/ai/events";
+  }
+
   // 管理员分页查询聊天记录
   rpc ListAllChatHistoryByPageForAdmin(ChatHistoryQueryRequest) returns (BaseResponsePageChatHistory) {
     option (api.post) = "/chatHistory/admin/list/page/vo";
@@ -108,6 +132,18 @@ message BaseResponsePageChatHistory {
   string message = 3;
 }
 
+message BaseResponseAIState {
+  int32 code = 1;
+  AIState data = 2;
+  string message = 3;
+}
+
+message BaseResponseAIEvents {
+  int32 code = 1;
+  AIEvents data = 2;
+  string message = 3;
+}
+
 message BaseResponseBytes {
   int32 code = 1;
   bytes data = 2;
@@ -155,6 +191,29 @@ message GetAppVOByIdByAdminRequest {
 message ChatToGenCodeRequest {
   int64 appId = 1 [(api.query) = "appId"];
   string message = 2 [(api.query) = "message"];
+}
+
+message AISubmitRequest {
+  int64 appId = 1;
+  string message = 2;
+}
+
+message AIControlRequest {
+  int64 appId = 1;
+  string content = 2;
+  string reason = 3;
+  string targetId = 4;
+}
+
+message AIStateRequest {
+  int64 appId = 1 [(api.query) = "appId"];
+}
+
+message AIEventsRequest {
+  int64 appId = 1 [(api.query) = "appId"];
+  string lastId = 2 [(api.query) = "lastId"];
+  int64 blockMs = 3 [(api.query) = "blockMs"];
+  int64 count = 4 [(api.query) = "count"];
 }
 
 message DownloadAppCodeRequest {
@@ -229,6 +288,44 @@ message ChatHistory {
   string createTime = 6;
   string updateTime = 7;
   int64 isDelete = 8;
+}
+
+message AIPendingInterrupt {
+  string id = 1;
+  string agent = 2;
+  string content = 3;
+  string payloadJson = 4;
+}
+
+message AIState {
+  bool exists = 1;
+  string status = 2;
+  string agent = 3;
+  string lastEventId = 4;
+  string checkpointId = 5;
+  repeated AIPendingInterrupt pendingInterrupts = 6;
+  string message = 7;
+  string buffer = 8;
+  bool isCancelled = 9;
+  int64 updatedAt = 10;
+}
+
+message AIEvent {
+  string id = 1;
+  string projectId = 2;
+  string type = 3;
+  string agent = 4;
+  string content = 5;
+  string targetId = 6;
+  string name = 7;
+  string status = 8;
+  string payloadJson = 9;
+  int64 createdAt = 10;
+}
+
+message AIEvents {
+  repeated AIEvent events = 1;
+  string lastId = 2;
 }
 
 message PageAppVO {

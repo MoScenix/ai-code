@@ -185,3 +185,38 @@ func _listappchathistoryMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _aiMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _answeraiMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _cancelaiMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _listaieventsMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _pushaiMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _getaistateMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _submitaiMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

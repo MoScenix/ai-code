@@ -1,6 +1,8 @@
 package ai
 
 import (
+	"context"
+
 	ai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai/aiservice"
 

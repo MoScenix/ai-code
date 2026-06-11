@@ -5,12 +5,7 @@ package ai;
 option go_package = "ai";
 
 message AiReq {
-  string project_id = 2;
-  repeated historyItem history = 1;
-}
-message historyItem {
-  string question = 1;
-  string role = 2;
+  string project_id = 1;
 }
 
 message AiResp {

@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
-	"errors"
+	"io"
+	"os"
+	"path/filepath"
 	"testing"
 
 	ai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
@@ -61,19 +63,24 @@ func (f *fakeChatStream) Close() error {
 	return nil
 }
 func (f *fakeChatStream) Recv() (*ai.AiReq, error) {
-	return nil, ErrChatRuntimeUnavailable
+	return nil, io.EOF
 }
 
 func TestChat_Run(t *testing.T) {
+	shareDir := filepath.Join(t.TempDir(), "project")
+	confPath := filepath.Join(t.TempDir(), "filestore.yaml")
+	content := []byte("ShareDir:\n  share_dir: " + shareDir + "\ncache:\n  cache_dir: " + filepath.Join(shareDir, "cache") + "\n  ttl_seconds: 7200\n  need_flush: true\n")
+	if err := os.WriteFile(confPath, content, 0644); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("FILESTORE_CONF_PATH", confPath)
+
 	req := &ai.AiReq{
 		ProjectId: "demo",
-		History: []*ai.HistoryItem{
-			{Role: "user", Question: `测试，写一个upcpc竞赛宣传网页`},
-		},
 	}
 	var a = fakeChatStream{}
-	err := NewChatService(context.Background()).Run(req, &a)
-	if !errors.Is(err, ErrChatRuntimeUnavailable) {
-		t.Fatalf("expected ErrChatRuntimeUnavailable, got %v", err)
+	err := NewChatService(context.Background()).Run(req.GetProjectId(), &a)
+	if err != nil {
+		t.Fatalf("expected nil, got %v", err)
 	}
 }

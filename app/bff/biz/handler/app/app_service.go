@@ -317,3 +317,123 @@ func ListAppChatHistory(ctx context.Context, c *app.RequestContext) {
 	}
 	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
 }
+
+// SubmitAI .
+// @router /app/ai/submit [POST]
+func SubmitAI(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.AISubmitRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewSubmitAIService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// PushAI .
+// @router /app/ai/push [POST]
+func PushAI(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.AIControlRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewPushAIService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// AnswerAI .
+// @router /app/ai/answer [POST]
+func AnswerAI(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.AIControlRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewAnswerAIService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// CancelAI .
+// @router /app/ai/cancel [POST]
+func CancelAI(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.AIControlRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewCancelAIService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// GetAIState .
+// @router /app/ai/state [GET]
+func GetAIState(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.AIStateRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewGetAIStateService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
+
+// ListAIEvents .
+// @router /app/ai/events [GET]
+func ListAIEvents(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req lapp.AIEventsRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+
+	resp, err := service.NewListAIEventsService(ctx, c).Run(&req)
+
+	if err != nil {
+		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
+		return
+	}
+	utils.SendSuccessResponse(ctx, c, consts.StatusOK, resp)
+}
