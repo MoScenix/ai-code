@@ -40,6 +40,8 @@ const (
 	ProjectStatusError         = "error"
 )
 
+const MaxEventContentRunes = 1200
+
 type ControlEvent struct {
 	ProjectID string            `json:"project_id"`
 	Type      ControlType       `json:"type"`
@@ -80,6 +82,14 @@ type PendingInterrupt struct {
 	Payload map[string]any `json:"payload,omitempty"`
 }
 
+const (
+	PayloadInfo           = "info"
+	PayloadADKInterruptID = "adk_interrupt_id"
+	PayloadControlCursor  = "control_cursor"
+	PayloadDesignerLastID = "designer_last_id"
+	PayloadLastEventID    = "last_event_id"
+)
+
 func NewControl(projectID string, typ ControlType) ControlEvent {
 	return ControlEvent{
 		ProjectID: projectID,
@@ -97,15 +107,15 @@ func NewEvent(projectID string, typ EventType) TaskEvent {
 }
 
 func ControlKey(projectID string) string {
-	return StreamKey(projectID)
+	return projectKey(projectID, "control")
 }
 
 func EventKey(projectID string) string {
-	return StreamKey(projectID)
+	return projectKey(projectID, "stream")
 }
 
 func StreamKey(projectID string) string {
-	return projectKey(projectID, "stream")
+	return EventKey(projectID)
 }
 
 func CursorKey(projectID string) string {
@@ -134,4 +144,77 @@ func projectKey(projectID, suffix string) string {
 		return fmt.Sprintf("project:unknown:%s", suffix)
 	}
 	return fmt.Sprintf("project:%s:%s", projectID, suffix)
+}
+
+func PayloadString(payload map[string]any, key string) string {
+	if payload == nil {
+		return ""
+	}
+	value, ok := payload[key]
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(fmt.Sprint(value))
+}
+
+func NestedPayload(payload map[string]any, key string) map[string]any {
+	if payload == nil {
+		return nil
+	}
+	nested, ok := payload[key].(map[string]any)
+	if !ok {
+		return nil
+	}
+	return nested
+}
+
+func ADKInterruptID(payload map[string]any) string {
+	return PayloadString(payload, PayloadADKInterruptID)
+}
+
+func ControlCursor(payload map[string]any) string {
+	return PayloadString(payload, PayloadControlCursor)
+}
+
+func DesignerLastID(payload map[string]any) string {
+	if value := PayloadString(payload, PayloadDesignerLastID); value != "" {
+		return value
+	}
+	return PayloadString(payload, PayloadLastEventID)
+}
+
+func PendingInterruptTargetIDs(interrupt PendingInterrupt) map[string]bool {
+	ids := make(map[string]bool)
+	if id := strings.TrimSpace(interrupt.ID); id != "" {
+		ids[id] = true
+	}
+	if id := ADKInterruptID(interrupt.Payload); id != "" {
+		ids[id] = true
+	}
+	if id := ADKInterruptID(NestedPayload(interrupt.Payload, PayloadInfo)); id != "" {
+		ids[id] = true
+	}
+	return ids
+}
+
+func PendingInterruptMatches(interrupt PendingInterrupt, targetID string) bool {
+	targetID = strings.TrimSpace(targetID)
+	return targetID != "" && PendingInterruptTargetIDs(interrupt)[targetID]
+}
+
+func PendingInterruptsMatch(interrupts []PendingInterrupt, targetID string) bool {
+	for _, interrupt := range interrupts {
+		if PendingInterruptMatches(interrupt, targetID) {
+			return true
+		}
+	}
+	return false
+}
+
+func TrimEventContent(content string) string {
+	runes := []rune(content)
+	if len(runes) <= MaxEventContentRunes {
+		return content
+	}
+	return string(runes[:MaxEventContentRunes]) + fmt.Sprintf("\n... truncated %d chars", len(runes)-MaxEventContentRunes)
 }

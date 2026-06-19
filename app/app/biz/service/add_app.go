@@ -11,6 +11,7 @@ import (
 	"github.com/MoScenix/ai-code/app/app/biz/model"
 	"github.com/MoScenix/ai-code/app/app/conf"
 	app "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 type AddAppService struct {
@@ -27,9 +28,11 @@ func (s *AddAppService) Run(req *app.AddAppReq) (resp *app.AddAppResp, err error
 	}
 	op, err := getOperator(s.ctx)
 	if err != nil {
+		klog.CtxErrorf(s.ctx, "create app operator check failed: err=%v", err)
 		return nil, err
 	}
 	if req.UserId != 0 && !op.isAdmin() && uint(req.UserId) != op.userID {
+		klog.CtxWarnf(s.ctx, "create app forbidden: user_id=%d operator_id=%d", req.UserId, op.userID)
 		return nil, errForbidden
 	}
 	if req.UserId == 0 || !op.isAdmin() {
@@ -43,13 +46,16 @@ func (s *AddAppService) Run(req *app.AddAppReq) (resp *app.AddAppResp, err error
 		Priority:   1,
 	})
 	if err != nil {
+		klog.CtxErrorf(s.ctx, "create app db failed: user_id=%d err=%v", req.UserId, err)
 		return nil, err
 	}
 	path := filepath.Join(conf.GetConf().ShareDir.ShareDir, strconv.FormatInt(int64(res.ID), 10))
 	err = os.MkdirAll(path, os.ModePerm)
 	if err != nil {
+		klog.CtxErrorf(s.ctx, "create app directory failed: app_id=%d err=%v", res.ID, err)
 		return nil, err
 	}
+	klog.CtxInfof(s.ctx, "app created: app_id=%d user_id=%d", res.ID, req.UserId)
 	return &app.AddAppResp{
 		Id: int64(res.ID),
 	}, err

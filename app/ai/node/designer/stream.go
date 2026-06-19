@@ -2,69 +2,44 @@ package designer
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/MoScenix/ai-code/app/ai/agent"
-	"github.com/MoScenix/ai-code/app/ai/utils"
 	"github.com/MoScenix/ai-code/common/aievent"
-	"github.com/MoScenix/ai-code/common/redisstream"
 )
 
-const answerWait = 30 * time.Second
+const answerWait = 60 * time.Second
 
-func waitAnswer(ctx context.Context, store redisstream.Store, projectID string, afterID string, targetID string) (agent.DesignerAnswer, bool, error) {
-	if store == nil || projectID == "" || targetID == "" {
+type answerEvent struct {
+	TargetID string
+	Answer   agent.DesignerAnswer
+}
+
+func waitAnswer(ctx context.Context, answers <-chan answerEvent, targetID string) (agent.DesignerAnswer, bool, error) {
+	if answers == nil || targetID == "" {
 		return agent.DesignerAnswer{}, false, nil
 	}
 
-	deadline := time.Now().Add(answerWait)
-	lastID := afterID
+	timer := time.NewTimer(answerWait)
+	defer timer.Stop()
 	for {
-		remain := time.Until(deadline)
-		if remain <= 0 {
-			return agent.DesignerAnswer{}, false, nil
-		}
-		messages, err := store.Read(ctx, aievent.StreamKey(projectID), lastID, redisstream.ReadOptions{
-			Block: remain,
-			Count: 10,
-		})
-		if err != nil {
-			if ctx.Err() != nil {
-				return agent.DesignerAnswer{}, false, ctx.Err()
-			}
-			return agent.DesignerAnswer{}, false, err
-		}
-		for _, msg := range messages {
-			lastID = msg.ID
-			event, err := redisstream.Decode[aievent.TaskEvent](msg)
-			if err != nil || event.Type != aievent.EventAnswer {
-				continue
-			}
-			if strings.TrimSpace(event.TargetID) != targetID {
-				continue
-			}
-			return agent.DesignerAnswer{
-				Content: event.Content,
-				Payload: event.Payload,
-			}, true, nil
-		}
-		if ctx.Err() != nil {
+		select {
+		case <-ctx.Done():
 			return agent.DesignerAnswer{}, false, ctx.Err()
+		case <-timer.C:
+			return agent.DesignerAnswer{}, false, nil
+		case event := <-answers:
+			if event.TargetID != "" && event.TargetID != targetID {
+				continue
+			}
+			return event.Answer, true, nil
 		}
 	}
 }
 
-func lastEventCursor(ctx context.Context, projectID string) string {
-	stateStore, ok := utils.StateStoreFromContext(ctx)
-	if !ok || stateStore == nil || projectID == "" {
-		return "$"
+func agentAnswer(event aievent.TaskEvent) agent.DesignerAnswer {
+	return agent.DesignerAnswer{
+		Content: event.Content,
+		Payload: event.Payload,
 	}
-
-	var state aievent.ProjectState
-	ok, err := stateStore.Get(ctx, aievent.RunningStateKey(projectID), &state)
-	if err != nil || !ok || strings.TrimSpace(state.LastEventID) == "" {
-		return "$"
-	}
-	return state.LastEventID
 }

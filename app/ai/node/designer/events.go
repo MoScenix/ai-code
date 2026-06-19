@@ -31,7 +31,7 @@ func publishAgentEvents(ctx context.Context, store redisstream.Store, projectID 
 				ProjectID: projectID,
 				Type:      aievent.EventError,
 				Agent:     event.AgentName,
-				Content:   event.Err.Error(),
+				Content:   aievent.TrimEventContent(event.Err.Error()),
 				CreatedAt: time.Now().UnixMilli(),
 			})
 			updateLastID(lastID, id)
@@ -49,12 +49,13 @@ func publishAgentEvents(ctx context.Context, store redisstream.Store, projectID 
 				CreatedAt: time.Now().UnixMilli(),
 			})
 			updateLastID(lastID, id)
+			utils.SetControlCursor(ctx, id)
 			interrupt.EventID = id
 			if stateStore, ok := utils.StateStoreFromContext(ctx); ok && stateStore != nil {
 				_ = setProjectState(ctx, stateStore, projectID, aievent.ProjectState{
 					Status:      aievent.ProjectStatusWaitingAnswer,
 					Agent:       event.AgentName,
-					LastEventID: id,
+					LastEventID: stateLastEventID(ctx, stateStore, projectID),
 					PendingInterrupts: []aievent.PendingInterrupt{
 						{
 							ID:      interrupt.ID,
@@ -117,14 +118,16 @@ func publishSchemaMessage(ctx context.Context, store redisstream.Store, projectI
 		return "", nil
 	}
 	eventType := aievent.EventMessage
+	content := msg.Content
 	if role == schema.Tool {
 		eventType = aievent.EventToolResult
+		content = aievent.TrimEventContent(content)
 	}
 	return publishTaskEvent(ctx, store, aievent.TaskEvent{
 		ProjectID: projectID,
 		Type:      eventType,
 		Agent:     agentName,
-		Content:   msg.Content,
+		Content:   content,
 		Name:      toolName,
 		CreatedAt: time.Now().UnixMilli(),
 	})
@@ -137,17 +140,9 @@ func publishTaskEvent(ctx context.Context, store redisstream.Store, event aieven
 	if event.CreatedAt == 0 {
 		event.CreatedAt = time.Now().UnixMilli()
 	}
-	id, err := store.Add(ctx, aievent.StreamKey(event.ProjectID), event)
+	id, err := store.Add(ctx, aievent.EventKey(event.ProjectID), event)
 	if err != nil {
 		return "", err
-	}
-	if stateStore, ok := utils.StateStoreFromContext(ctx); ok && stateStore != nil {
-		_ = stateStore.Set(ctx, aievent.RunningStateKey(event.ProjectID), aievent.ProjectState{
-			Status:      "running",
-			Agent:       agentName,
-			LastEventID: id,
-			UpdatedAt:   time.Now().UnixMilli(),
-		})
 	}
 	return id, nil
 }
@@ -157,6 +152,18 @@ func setProjectState(ctx context.Context, store *redisstate.Store, projectID str
 		return nil
 	}
 	return store.Set(ctx, aievent.RunningStateKey(projectID), state)
+}
+
+func stateLastEventID(ctx context.Context, store *redisstate.Store, projectID string) string {
+	if store == nil || projectID == "" {
+		return ""
+	}
+	var state aievent.ProjectState
+	ok, err := store.Get(ctx, aievent.RunningStateKey(projectID), &state)
+	if err != nil || !ok {
+		return ""
+	}
+	return state.LastEventID
 }
 
 func updateLastID(lastID *string, id string) {
@@ -181,8 +188,9 @@ func newInterruptEvent(agentName string, info *adk.InterruptInfo) *interruptEven
 	id := rootInterruptID(info)
 	content := fmt.Sprint(userInfo)
 	if input, ok := userInfo.(agent.AskUserInput); ok {
-		content = strings.Join(input.Questions, "\n")
-		payload["questions"] = input.Questions
+		questions := normalizeAskQuestions(input.Questions)
+		content = askQuestionsContent(questions)
+		payload["questions"] = questions
 		payload["context"] = input.Context
 	}
 	payload["agent"] = agentName
@@ -191,6 +199,36 @@ func newInterruptEvent(agentName string, info *adk.InterruptInfo) *interruptEven
 		Content: content,
 		Payload: payload,
 	}
+}
+
+func normalizeAskQuestions(questions []agent.AskUserQuestion) []agent.AskUserQuestion {
+	out := make([]agent.AskUserQuestion, 0, len(questions))
+	for _, question := range questions {
+		text := strings.TrimSpace(question.Question)
+		if text == "" {
+			continue
+		}
+		options := make([]string, 0, len(question.Options))
+		for _, option := range question.Options {
+			option = strings.TrimSpace(option)
+			if option != "" {
+				options = append(options, option)
+			}
+		}
+		out = append(out, agent.AskUserQuestion{
+			Question: text,
+			Options:  options,
+		})
+	}
+	return out
+}
+
+func askQuestionsContent(questions []agent.AskUserQuestion) string {
+	lines := make([]string, 0, len(questions))
+	for _, question := range questions {
+		lines = append(lines, question.Question)
+	}
+	return strings.Join(lines, "\n")
 }
 
 func interruptUserInfo(info *adk.InterruptInfo) any {
@@ -228,6 +266,18 @@ func rootInterruptID(info *adk.InterruptInfo) string {
 	for _, ctx := range info.InterruptContexts {
 		if ctx != nil && strings.TrimSpace(ctx.ID) != "" {
 			return ctx.ID
+		}
+	}
+	if cmInfo, ok := info.Data.(*adk.ChatModelAgentInterruptInfo); ok && cmInfo != nil && cmInfo.Info != nil {
+		for _, ctx := range cmInfo.Info.InterruptContexts {
+			if ctx != nil && ctx.IsRootCause && strings.TrimSpace(ctx.ID) != "" {
+				return ctx.ID
+			}
+		}
+		for _, ctx := range cmInfo.Info.InterruptContexts {
+			if ctx != nil && strings.TrimSpace(ctx.ID) != "" {
+				return ctx.ID
+			}
 		}
 	}
 	return ""

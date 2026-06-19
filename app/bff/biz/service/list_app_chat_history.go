@@ -49,6 +49,7 @@ func (h *ListAppChatHistoryService) Run(req *lapp.ListAppChatHistoryRequest) (re
 			CreateTime:  v.CreateTime,
 			UpdateTime:  v.UpdateTime,
 			IsDelete:    v.IsDelete,
+			IsFile:      v.IsFile,
 		})
 	}
 	return resp, nil

@@ -5,6 +5,7 @@ import (
 	"net"
 	"time"
 
+	"github.com/MoScenix/ai-code/app/ai/biz/dal"
 	"github.com/MoScenix/ai-code/app/ai/conf"
 	"github.com/MoScenix/ai-code/common/mtl"
 	"github.com/MoScenix/ai-code/common/serversuit"
@@ -22,6 +23,7 @@ func main() {
 	godotenv.Load()
 	tp := mtl.TraceInit(conf.GetConf().Kitex.Service)
 	defer tp.Shutdown(context.Background())
+	dal.Init()
 	mtl.InitMetric(conf.GetConf().Kitex.Service, conf.GetConf().Kitex.MetricsPort, conf.GetConf().Registry.RegistryAddress[0])
 	opts := kitexInit()
 

@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
@@ -23,8 +22,9 @@ func NewListMyAppVOByPageService(Context context.Context, RequestContext *app.Re
 
 func (h *ListMyAppVOByPageService) Run(req *lapp.AppQueryRequest) (resp *lapp.BaseResponsePageAppVO, err error) {
 	if req.UserId == 0 {
-		userID, err := parseUserID(h.Context.Value(utils.UserIdKey))
-		if err != nil {
+		userID, ok := utils.UserIDFromContext(h.Context)
+		if !ok || userID <= 0 {
+			err = utils.ErrUnauthorizedUserID
 			return &lapp.BaseResponsePageAppVO{
 				Code:    1,
 				Message: err.Error(),
@@ -89,15 +89,3 @@ func (h *ListMyAppVOByPageService) Run(req *lapp.AppQueryRequest) (resp *lapp.Ba
 	}
 	return resp, nil
 }
-
-func parseUserID(v interface{}) (int64, error) {
-	switch value := v.(type) {
-	case float64:
-		if value > 0 {
-			return int64(value), nil
-		}
-	}
-	return 0, errors.New("unauthorized: missing user id")
-}
-
-// parseUserRole removed: not needed for list-my filtering

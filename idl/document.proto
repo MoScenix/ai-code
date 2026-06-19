@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package document;
+
+option go_package = "document";
+
+message ParsePDFToTextReq {
+  int64 project_id = 1;
+  int64 file_id = 2;
+}
+
+message ParsePDFToTextResp {
+  int64 file_id = 1;
+  string text_filename = 2;
+  int64 text_size = 3;
+}
+
+message IndexTextFileReq {
+  int64 project_id = 1;
+  int64 file_id = 2;
+  int64 min_size = 3;
+  int64 max_size = 4;
+}
+
+message IndexTextFileResp {
+  int64 file_id = 1;
+  int64 chunk_count = 2;
+  int64 parent_count = 3;
+}
+
+message SearchFileReq {
+  int64 project_id = 1;
+  int64 file_id = 2;
+  string query = 3;
+  int64 top_k = 4;
+}
+
+message SearchFileResp {
+  repeated SearchHit hits = 1;
+}
+
+message SearchHit {
+  int64 file_id = 1;
+  int64 chunk_id = 2;
+  int64 parent_id = 3;
+  string content = 6;
+  double score = 7;
+}
+
+message DeleteProjectFileDataReq {
+  int64 project_id = 1;
+}
+
+message DeleteProjectFileDataResp {
+  bool success = 1;
+}
+
+service DocumentService {
+  rpc ParsePDFToText(ParsePDFToTextReq) returns (ParsePDFToTextResp);
+  rpc IndexTextFile(IndexTextFileReq) returns (IndexTextFileResp);
+  rpc SearchFile(SearchFileReq) returns (SearchFileResp);
+  rpc DeleteProjectFileData(DeleteProjectFileDataReq) returns (DeleteProjectFileDataResp);
+}

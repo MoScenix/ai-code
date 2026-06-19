@@ -116,6 +116,14 @@ func (s *RedisStore) Del(ctx context.Context, key string) error {
 	return s.client.Del(ctx, fullKey).Err()
 }
 
+func (s *RedisStore) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	fullKey, err := s.fullKey(key)
+	if err != nil {
+		return err
+	}
+	return s.client.Expire(ctx, fullKey, ttl).Err()
+}
+
 func (s *RedisStore) fullKey(key string) (string, error) {
 	key = strings.Trim(key, ":")
 	if key == "" {

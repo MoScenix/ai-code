@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/redis/go-redis/v9"
 )
@@ -71,6 +72,14 @@ func (s *Store) Del(ctx context.Context, keys ...string) error {
 		fullKeys = append(fullKeys, fullKey)
 	}
 	return s.client.Del(ctx, fullKeys...).Err()
+}
+
+func (s *Store) Expire(ctx context.Context, key string, ttl time.Duration) error {
+	fullKey, err := s.fullKey(key)
+	if err != nil {
+		return err
+	}
+	return s.client.Expire(ctx, fullKey, ttl).Err()
 }
 
 func (s *Store) fullKey(key string) (string, error) {

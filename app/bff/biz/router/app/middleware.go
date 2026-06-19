@@ -220,3 +220,13 @@ func _submitaiMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _fileMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _addfileMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

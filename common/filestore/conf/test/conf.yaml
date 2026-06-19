@@ -1,7 +1,7 @@
 ShareDir:
-  share_dir: /static/project/
+  share_dir: ../../static/project/
 
 cache:
-  cache_dir: /static/project/cache/
+  cache_dir: ../../static/cache/
   ttl_seconds: 7200
   need_flush: true

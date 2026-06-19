@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"strconv"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
@@ -40,23 +39,11 @@ func (h *ChatToGenCodeService) Run(req *lapp.ChatToGenCodeRequest) (resp *lapp.S
 	var Queryc = ai.AiReq{
 		ProjectId: strconv.FormatInt(req.AppId, 10),
 	}
-	stream, err := rpc.AiClient.Chat(h.Context, &Queryc)
+	data, err := rpc.AiClient.Chat(utils.WithIdentityMeta(h.Context), &Queryc)
 	if err != nil {
 		return SendErr(w, err)
 	}
-	defer stream.Close()
-
-	queued := false
-	for {
-		data, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return SendErr(w, err)
-		}
-		queued = data.GetAnswer() == "true"
-	}
+	queued := data.GetAnswer() == "true"
 	event := "queued"
 	message := "true"
 	if !queued {

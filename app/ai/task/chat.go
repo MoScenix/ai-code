@@ -11,24 +11,35 @@ import (
 	"github.com/MoScenix/ai-code/app/ai/utils"
 	"github.com/MoScenix/ai-code/common/aievent"
 	"github.com/MoScenix/ai-code/common/filestore/project"
-	ai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
+	"github.com/MoScenix/ai-code/common/rpcmeta"
 )
 
 type ChatTask struct {
 	ProjectID string
-	Stream    ai.AiService_ChatServer
 
 	ctx           context.Context
 	runtime       *utils.RuntimeState
+	identity      rpcmeta.Identity
 	needResume    bool
 	previousState aievent.ProjectState
 }
 
-func NewChatTask(projectID string, stream ai.AiService_ChatServer) *ChatTask {
-	return &ChatTask{
-		ProjectID: strings.TrimSpace(projectID),
-		Stream:    stream,
+type ChatTaskOption func(*ChatTask)
+
+func WithIdentity(identity rpcmeta.Identity) ChatTaskOption {
+	return func(t *ChatTask) {
+		t.identity = identity
 	}
+}
+
+func NewChatTask(projectID string, opts ...ChatTaskOption) *ChatTask {
+	task := &ChatTask{
+		ProjectID: strings.TrimSpace(projectID),
+	}
+	for _, opt := range opts {
+		opt(task)
+	}
+	return task
 }
 
 func (t *ChatTask) Init(ctx context.Context) (context.Context, error) {
@@ -36,6 +47,7 @@ func (t *ChatTask) Init(ctx context.Context) (context.Context, error) {
 		return t.ctx, nil
 	}
 
+	ctx = rpcmeta.WithIdentity(ctx, t.identity)
 	runCtx, cancel := context.WithCancel(ctx)
 	runtime := utils.NewRuntimeState(cancel)
 
@@ -116,7 +128,17 @@ func (t *ChatTask) loadPlan(ctx context.Context) error {
 	if buffer, ok := utils.StringBufferFromContext(ctx); ok && state.Buffer != "" {
 		buffer.SetString(state.Buffer)
 	}
+	if cursor := pendingControlCursor(state); cursor != "" {
+		utils.SetControlCursor(ctx, cursor)
+	}
 	return nil
+}
+
+func pendingControlCursor(state aievent.ProjectState) string {
+	if len(state.PendingInterrupts) == 0 || state.PendingInterrupts[0].Payload == nil {
+		return ""
+	}
+	return aievent.ControlCursor(state.PendingInterrupts[0].Payload)
 }
 
 func (t *ChatTask) markState(ctx context.Context, status string) error {

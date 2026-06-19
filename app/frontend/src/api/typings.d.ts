@@ -1,4 +1,92 @@
 declare namespace API {
+  type AIEventType =
+    | 'accepted'
+    | 'answer'
+    | 'agent_start'
+    | 'message'
+    | 'push'
+    | 'tool_call'
+    | 'tool_result'
+    | 'question'
+    | 'done'
+    | 'cancelled'
+    | 'error'
+
+  type AIStatusType = 'queued' | 'running' | 'waiting_answer' | 'interrupted' | 'done' | 'cancelled' | 'error'
+
+  type AIEvent = {
+    id?: string
+    type?: AIEventType
+    agent?: string
+    content?: string
+    targetId?: string
+    name?: string
+    payloadJson?: string
+    createdAt?: number
+    questions?: AIQuestion[]
+  }
+
+  type AIPendingInterrupt = {
+    id?: string
+    agent?: string
+    content?: string
+    payloadJson?: string
+  }
+
+  type AIQuestion = {
+    question?: string
+    options?: string[]
+  }
+
+  type AIState = {
+    exists?: boolean
+    status?: AIStatusType
+    agent?: string
+    lastEventId?: string
+    pendingInterrupts?: AIPendingInterrupt[]
+    message?: string
+  }
+
+  type AIEvents = {
+    events?: AIEvent[]
+    lastId?: string
+  }
+
+  type AISubmitRequest = {
+    appId?: number
+    message?: string
+  }
+
+  type AIControlRequest = {
+    appId?: number
+    content?: string
+    reason?: string
+    targetId?: string
+  }
+
+  type AIStateRequest = {
+    appId: number
+  }
+
+  type AIEventsRequest = {
+    appId: number
+    lastId?: string
+    blockMs?: number
+    count?: number
+  }
+
+  type BaseResponseAIState = {
+    code?: number
+    data?: AIState
+    message?: string
+  }
+
+  type BaseResponseAIEvents = {
+    code?: number
+    data?: AIEvents
+    message?: string
+  }
+
   type AppAddRequest = {
     initPrompt?: string
   }

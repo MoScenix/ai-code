@@ -53,7 +53,7 @@ func initConf() {
 		panic("filestore: ShareDir.share_dir is empty")
 	}
 	if conf.Cache.CacheDir == "" {
-		conf.Cache.CacheDir = filepath.Join(conf.ShareDir.ShareDir, "cache")
+		conf.Cache.CacheDir = filepath.Join(filepath.Dir(filepath.Clean(conf.ShareDir.ShareDir)), "cache")
 	}
 	if conf.Cache.TTLSeconds <= 0 {
 		conf.Cache.TTLSeconds = 7200

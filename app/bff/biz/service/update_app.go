@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
 	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
 	rpcapp "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
@@ -19,7 +20,8 @@ func NewUpdateAppService(Context context.Context, RequestContext *app.RequestCon
 }
 
 func (h *UpdateAppService) Run(req *lapp.AppUpdateRequest) (resp *lapp.BaseResponseBoolean, err error) {
-	res, err := rpc.AppClient.UpdateApp(h.Context, &rpcapp.UpdateAppReq{
+	ctx := utils.WithIdentityMeta(h.Context)
+	res, err := rpc.AppClient.UpdateApp(ctx, &rpcapp.UpdateAppReq{
 		Id:      req.Id,
 		AppName: req.AppName,
 	})

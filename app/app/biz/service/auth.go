@@ -8,13 +8,8 @@ import (
 	"github.com/MoScenix/ai-code/app/app/biz/dal/mysql"
 	"github.com/MoScenix/ai-code/app/app/biz/dal/redis"
 	"github.com/MoScenix/ai-code/app/app/biz/model"
+	"github.com/MoScenix/ai-code/common/rpcmeta"
 	"github.com/bytedance/gopkg/cloud/metainfo"
-)
-
-const (
-	metaUserIDKey   = "x-user-id"
-	metaUserRoleKey = "x-user-role"
-	adminRole       = "admin"
 )
 
 var (
@@ -29,11 +24,11 @@ type operator struct {
 }
 
 func (o operator) isAdmin() bool {
-	return o.role == adminRole
+	return o.role == rpcmeta.AdminRole
 }
 
 func getOperator(ctx context.Context) (operator, error) {
-	userIDStr, ok := metainfo.GetPersistentValue(ctx, metaUserIDKey)
+	userIDStr, ok := metainfo.GetPersistentValue(ctx, rpcmeta.OperatorIDKey)
 	if !ok {
 		return operator{}, errUnauthorized
 	}
@@ -41,7 +36,7 @@ func getOperator(ctx context.Context) (operator, error) {
 	if err != nil || userID == 0 {
 		return operator{}, errUnauthorized
 	}
-	role, _ := metainfo.GetPersistentValue(ctx, metaUserRoleKey)
+	role, _ := metainfo.GetPersistentValue(ctx, rpcmeta.OperatorRoleKey)
 	return operator{
 		userID: uint(userID),
 		role:   role,

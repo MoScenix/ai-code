@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 
+	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
 	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
 	rpcapp "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
@@ -19,7 +20,8 @@ func NewDeleteAppByAdminService(Context context.Context, RequestContext *app.Req
 }
 
 func (h *DeleteAppByAdminService) Run(req *lapp.DeleteRequest) (resp *lapp.BaseResponseBoolean, err error) {
-	res, err := rpc.AppClient.DeleteApp(h.Context, &rpcapp.DeleteAppReq{
+	ctx := utils.WithIdentityMeta(h.Context)
+	res, err := rpc.AppClient.DeleteApp(ctx, &rpcapp.DeleteAppReq{
 		Id: req.Id,
 	})
 	if err != nil {

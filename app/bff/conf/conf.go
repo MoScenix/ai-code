@@ -23,10 +23,15 @@ type Config struct {
 	MySQL  MySQL  `yaml:"mysql"`
 	Redis  Redis  `yaml:"redis"`
 	Consul Consul `yaml:"consul"`
+	Static Static `yaml:"static"`
+	Deploy Deploy `yaml:"deploy"`
+	File   File   `yaml:"file"`
 }
+
 type Consul struct {
 	Address string `yaml:"address"`
 }
+
 type MySQL struct {
 	DSN string `yaml:"dsn"`
 }
@@ -49,6 +54,26 @@ type Hertz struct {
 	LogMaxSize      int    `yaml:"log_max_size"`
 	LogMaxBackups   int    `yaml:"log_max_backups"`
 	LogMaxAge       int    `yaml:"log_max_age"`
+}
+
+type Static struct {
+	Route     string `yaml:"route"`
+	Root      string `yaml:"root"`
+	URLPrefix string `yaml:"url_prefix"`
+	Project   string `yaml:"project"`
+	Avatar    string `yaml:"avatar"`
+	Cover     string `yaml:"cover"`
+}
+
+type Deploy struct {
+	Root      string `yaml:"root"`
+	URLPrefix string `yaml:"url_prefix"`
+}
+
+type File struct {
+	BigThresholdBytes int64 `yaml:"big_threshold_bytes"`
+	ChunkMinSize      int64 `yaml:"chunk_min_size"`
+	ChunkMaxSize      int64 `yaml:"chunk_max_size"`
 }
 
 // GetConf gets configuration instance

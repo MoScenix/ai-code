@@ -75,6 +75,7 @@ message AppMessage {
   string createTime = 6;
   string updateTime = 7;
   int64 isDelete = 8;
+  bool isFile = 9;
 }
 
 message AddMessageReq {
@@ -82,6 +83,7 @@ message AddMessageReq {
   int64 userId = 2;
   string role = 3;        
   string content = 4;
+  bool isFile = 5;
 }
 
 message AddMessageResp {

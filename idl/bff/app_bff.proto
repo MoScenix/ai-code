@@ -41,6 +41,10 @@ service AppService {
     option (api.get) = "/app/download/:appId";
   }
 
+  rpc AddFile(AddFileRequest) returns (BaseResponseString) {
+    option (api.post) = "/app/file/add";
+  }
+
   rpc ChatToGenCode(ChatToGenCodeRequest) returns (stream ServerSentEventString) {
     option (api.get) = "/app/chat/gen/code";
   }
@@ -288,6 +292,11 @@ message ChatHistory {
   string createTime = 6;
   string updateTime = 7;
   int64 isDelete = 8;
+  bool isFile = 9;
+}
+
+message AddFileRequest {
+  int64 appId = 1;
 }
 
 message AIPendingInterrupt {
@@ -321,11 +330,17 @@ message AIEvent {
   string status = 8;
   string payloadJson = 9;
   int64 createdAt = 10;
+  repeated AIQuestion questions = 11;
 }
 
 message AIEvents {
   repeated AIEvent events = 1;
   string lastId = 2;
+}
+
+message AIQuestion {
+  string question = 1;
+  repeated string options = 2;
 }
 
 message PageAppVO {

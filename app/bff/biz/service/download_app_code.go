@@ -9,8 +9,10 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/MoScenix/ai-code/app/bff/conf"
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
 	"github.com/cloudwego/hertz/pkg/app"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 type DownloadAppCodeService struct {
@@ -23,8 +25,9 @@ func NewDownloadAppCodeService(Context context.Context, RequestContext *app.Requ
 }
 
 func (h *DownloadAppCodeService) Run(req *lapp.DownloadAppCodeRequest) (resp *lapp.BaseResponseBytes, err error) {
-	appDir := fmt.Sprintf("/static/project/%d", req.AppId)
+	appDir := conf.ProjectDir(req.AppId)
 	if _, err = os.Stat(appDir); err != nil {
+		klog.CtxWarnf(h.Context, "download app code not found: app_id=%d err=%v", req.AppId, err)
 		return nil, errors.New("app code not found")
 	}
 	h.RequestContext.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="app-%d.zip"`, req.AppId))

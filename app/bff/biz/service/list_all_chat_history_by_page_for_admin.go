@@ -49,6 +49,7 @@ func (h *ListAllChatHistoryByPageForAdminService) Run(req *lapp.ChatHistoryQuery
 			CreateTime:  v.CreateTime,
 			UpdateTime:  v.UpdateTime,
 			IsDelete:    v.IsDelete,
+			IsFile:      v.IsFile,
 		})
 	}
 	return resp, nil

@@ -31,6 +31,7 @@ func (s *AddMessageService) Run(req *app.AddMessageReq) (resp *app.AddMessageRes
 		AppId:   uint(req.AppId),
 		Role:    req.Role,
 		Content: req.Content,
+		IsFile:  req.IsFile,
 	})
 	if err != nil {
 		return nil, err

@@ -4,9 +4,9 @@ import (
 	"context"
 	"os"
 	"path/filepath"
-	"strconv"
 
 	"github.com/MoScenix/ai-code/app/bff/biz/utils"
+	"github.com/MoScenix/ai-code/app/bff/conf"
 	user "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/user"
 	"github.com/MoScenix/ai-code/app/bff/infra/rpc"
 	rpcuser "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user"
@@ -36,9 +36,10 @@ func (h *UpdateUserService) Run(req *user.UserUpdateRequest) (resp *user.BaseRes
 	}
 	avatar, err := h.RequestContext.FormFile("avatar")
 	if avatar != nil && err == nil {
-		req.UserAvatar = "/static/avatar/" + strconv.FormatInt(req.Id, 10) + ".jpg"
-		os.MkdirAll(filepath.Dir(req.UserAvatar), os.ModePerm)
-		h.RequestContext.SaveUploadedFile(avatar, req.UserAvatar)
+		avatarPath := conf.AvatarPath(req.Id)
+		req.UserAvatar = conf.AvatarURL(req.Id)
+		os.MkdirAll(filepath.Dir(avatarPath), os.ModePerm)
+		h.RequestContext.SaveUploadedFile(avatar, avatarPath)
 	}
 	_, err = rpc.UserClient.Update(h.Context, &rpcuser.UpdateReq{
 		Id:          req.Id,

@@ -11,9 +11,12 @@ import (
 	"github.com/MoScenix/ai-code/common/aievent"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 const agentName = "Coder"
+
+const terminalTaskTTL = 10 * time.Second
 
 func Run(ctx context.Context, input map[string]any) (map[string]any, error) {
 	if utils.IsCancelled(ctx) {
@@ -30,8 +33,10 @@ func Run(ctx context.Context, input map[string]any) (map[string]any, error) {
 	stateStore, _ := utils.StateStoreFromContext(ctx)
 	initialMessages := historyMessages(ctx, input)
 	if len(initialMessages) == 0 {
+		klog.CtxWarnf(ctx, "skip coder task: project_id=%s reason=empty_initial_messages", projectID)
 		return map[string]any{}, nil
 	}
+	klog.CtxInfof(ctx, "coder task started: project_id=%s", projectID)
 
 	coderAgent, err := agent.NewCoder(ctx, store)
 	if err != nil {
@@ -39,6 +44,7 @@ func Run(ctx context.Context, input map[string]any) (map[string]any, error) {
 	}
 
 	var lastEventID string
+	assistantOutput := &utils.StringBuffer{}
 	loopCtx, cancelLoop := context.WithCancel(ctx)
 	defer cancelLoop()
 
@@ -48,7 +54,7 @@ func Run(ctx context.Context, input map[string]any) (map[string]any, error) {
 			return coderAgent, nil
 		},
 		OnAgentEvents: func(ctx context.Context, _ *adk.TurnContext[[]*schema.Message, *schema.Message], events *adk.AsyncIterator[*adk.TypedAgentEvent[*schema.Message]]) error {
-			return publishAgentEvents(ctx, streamStore, projectID, events, &lastEventID)
+			return publishAgentEvents(ctx, streamStore, projectID, events, &lastEventID, assistantOutput)
 		},
 	})
 
@@ -59,74 +65,56 @@ func Run(ctx context.Context, input map[string]any) (map[string]any, error) {
 		CreatedAt: time.Now().UnixMilli(),
 	})
 	_ = setProjectState(ctx, stateStore, projectID, aievent.ProjectState{
-		Status:      "running",
+		Status:      aievent.ProjectStatusRunning,
 		Agent:       agentName,
-		LastEventID: lastEventID,
+		LastEventID: projectLastEventID(ctx, stateStore, projectID),
 		UpdatedAt:   time.Now().UnixMilli(),
 	})
 	loop.Push(initialMessages)
+	loop.Stop(adk.UntilIdleFor(3 * time.Second))
 
+	controlCtx, cancelControl := context.WithCancel(ctx)
 	controlDone := make(chan struct{})
 	go func() {
 		defer close(controlDone)
-		watchStream(loopCtx, stateStore, streamStore, projectID, loop, &lastEventID)
+		watchStream(controlCtx, stateStore, streamStore, projectID, loop, &lastEventID, assistantOutput)
 	}()
 
 	loop.Run(loopCtx)
 	state := loop.Wait()
 	cancelLoop()
+	cancelControl()
 	<-controlDone
+	output := assistantOutput.String()
 
 	if state != nil && state.ExitReason != nil {
 		if state.StopCause != "" {
-			lastEventID, _ := publishTaskEvent(ctx, streamStore, aievent.TaskEvent{
-				ProjectID: projectID,
-				Type:      aievent.EventCancelled,
-				Agent:     agentName,
-				Content:   state.StopCause,
-				CreatedAt: time.Now().UnixMilli(),
-			})
-			_ = setProjectState(ctx, stateStore, projectID, aievent.ProjectState{
-				Status:      "cancelled",
-				Agent:       agentName,
-				LastEventID: lastEventID,
-				Message:     state.StopCause,
-				UpdatedAt:   time.Now().UnixMilli(),
-			})
-			_ = clearProjectState(ctx, stateStore, streamStore, projectID)
+			klog.CtxWarnf(ctx, "coder task cancelled: project_id=%s cause=%s", projectID, state.StopCause)
+			publishTerminalEvent(ctx, streamStore, stateStore, projectID, aievent.EventCancelled, aievent.ProjectStatusCancelled, state.StopCause)
 			return map[string]any{}, nil
 		}
-		lastEventID, _ = publishTaskEvent(ctx, streamStore, aievent.TaskEvent{
-			ProjectID: projectID,
-			Type:      aievent.EventError,
-			Agent:     agentName,
-			Content:   state.ExitReason.Error(),
-			CreatedAt: time.Now().UnixMilli(),
-		})
-		_ = setProjectState(ctx, stateStore, projectID, aievent.ProjectState{
-			Status:      "error",
-			Agent:       agentName,
-			LastEventID: lastEventID,
-			Message:     state.ExitReason.Error(),
-			UpdatedAt:   time.Now().UnixMilli(),
-		})
-		_ = clearProjectState(ctx, stateStore, streamStore, projectID)
+		klog.CtxErrorf(ctx, "coder task failed: project_id=%s err=%v", projectID, state.ExitReason)
+		publishTerminalEvent(ctx, streamStore, stateStore, projectID, aievent.EventError, aievent.ProjectStatusError, state.ExitReason.Error())
 		return nil, state.ExitReason
 	}
 
-	lastEventID, _ = publishTaskEvent(ctx, streamStore, aievent.TaskEvent{
-		ProjectID: projectID,
-		Type:      aievent.EventDone,
-		Agent:     agentName,
-		CreatedAt: time.Now().UnixMilli(),
-	})
-	_ = setProjectState(ctx, stateStore, projectID, aievent.ProjectState{
-		Status:      "done",
-		Agent:       agentName,
-		LastEventID: lastEventID,
-		UpdatedAt:   time.Now().UnixMilli(),
-	})
-	_ = clearProjectState(ctx, stateStore, streamStore, projectID)
+	if err := store.Commit(ctx); err != nil {
+		klog.CtxErrorf(ctx, "commit coder changes failed: project_id=%s err=%v", projectID, err)
+		publishTerminalEvent(ctx, streamStore, stateStore, projectID, aievent.EventError, aievent.ProjectStatusError, err.Error())
+		return nil, err
+	}
+
+	if err := utils.AddProjectAssistantMessage(ctx, projectID, output); err != nil {
+		klog.CtxErrorf(ctx, "persist coder assistant message failed: project_id=%s err=%v", projectID, err)
+		publishTerminalEvent(ctx, streamStore, stateStore, projectID, aievent.EventError, aievent.ProjectStatusError, err.Error())
+		return nil, err
+	}
+	if strings.TrimSpace(output) != "" {
+		_ = updateProjectLastEventID(ctx, stateStore, projectID, lastEventID)
+	}
+
+	publishTerminalEvent(ctx, streamStore, stateStore, projectID, aievent.EventDone, aievent.ProjectStatusDone, "")
+	klog.CtxInfof(ctx, "coder task completed: project_id=%s", projectID)
 	return map[string]any{}, nil
 }
 

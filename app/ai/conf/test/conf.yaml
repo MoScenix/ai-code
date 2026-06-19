@@ -15,7 +15,7 @@ registry:
   password: ""
 
 mysql:
-  dsn: "gorm:gorm@tcp(127.0.0.1:3306)/gorm?charset=utf8mb4&parseTime=True&loc=Local"
+  dsn: "%s:%s@tcp(%s:3306)/%s?charset=utf8mb4&parseTime=True&loc=Local"
 
 redis:
   address: "127.0.0.1:6379"
@@ -23,7 +23,7 @@ redis:
   password: ""
   db: 0
 ShareDir:
-  share_dir: /root/Projects/ai-code/app/ai/static/project/
+  share_dir: ../../static/project/
 
 workpool:
   min_workers: 1

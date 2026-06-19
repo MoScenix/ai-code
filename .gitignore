@@ -4,3 +4,7 @@
 .DS_Store
 .codex
 AGENTS.md
+CLAUDE.md
+.pnpm-store
+.codex-home
+.claude

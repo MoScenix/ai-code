@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io"
 	"strconv"
 	"strings"
 	"time"
@@ -18,12 +17,14 @@ import (
 	"github.com/MoScenix/ai-code/common/redisstream"
 	rpcai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
 	rpcapp "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 func submitAITask(ctx context.Context, appID int64, message string) (bool, error) {
 	if appID <= 0 {
 		return false, fmt.Errorf("appId is required")
 	}
+	ctx = utils.WithIdentityMeta(ctx)
 	if strings.TrimSpace(message) != "" {
 		if err := addUserMessage(ctx, appID, message); err != nil {
 			return false, err
@@ -51,6 +52,7 @@ func answerAIQuestion(ctx context.Context, appID int64, content string, targetID
 	if appID <= 0 {
 		return false, fmt.Errorf("appId is required")
 	}
+	ctx = utils.WithIdentityMeta(ctx)
 	content = strings.TrimSpace(content)
 	if content == "" {
 		return false, fmt.Errorf("content is required")
@@ -71,19 +73,33 @@ func answerAIQuestion(ctx context.Context, appID int64, content string, targetID
 		return false, fmt.Errorf("pending interrupt target not found")
 	}
 
-	if _, err := addTaskEvent(ctx, appID, aievent.TaskEvent{
+	eventID, err := addTaskEvent(ctx, appID, aievent.TaskEvent{
 		ProjectID: projectID(appID),
 		Type:      aievent.EventAnswer,
 		Content:   content,
 		TargetID:  targetID,
-	}); err != nil {
+	})
+	if err != nil {
+		klog.CtxErrorf(ctx, "submit ai answer failed: app_id=%d target_id=%s err=%v", appID, targetID, err)
 		return false, err
 	}
+	klog.CtxInfof(ctx, "ai answer submitted: app_id=%d target_id=%s event_id=%s", appID, targetID, eventID)
 
 	if state.Status == aievent.ProjectStatusInterrupted {
 		return submitAI(ctx, appID)
 	}
-	return false, nil
+	if state.Status == aievent.ProjectStatusWaitingAnswer {
+		time.Sleep(300 * time.Millisecond)
+		latest, ok, err := loadAIState(ctx, appID)
+		if err != nil {
+			return false, err
+		}
+		if ok && latest.Status == aievent.ProjectStatusInterrupted && hasPendingInterrupt(latest, targetID) {
+			klog.CtxInfof(ctx, "resume interrupted ai task: app_id=%d target_id=%s", appID, targetID)
+			return submitAI(ctx, appID)
+		}
+	}
+	return true, nil
 }
 
 func cancelAIEvent(ctx context.Context, appID int64, reason string) (string, error) {
@@ -131,7 +147,7 @@ func listAIEvents(ctx context.Context, appID int64, lastID string, blockMS int64
 	if err != nil {
 		return nil, err
 	}
-	messages, err := store.Read(ctx, aievent.StreamKey(projectID(appID)), lastID, redisstream.ReadOptions{
+	messages, err := store.Read(ctx, aievent.EventKey(projectID(appID)), lastID, redisstream.ReadOptions{
 		Block: block,
 		Count: int64(count),
 	})
@@ -152,7 +168,7 @@ func listAIEvents(ctx context.Context, appID int64, lastID string, blockMS int64
 }
 
 func addUserMessage(ctx context.Context, appID int64, content string) error {
-	userID, _ := contextUserID(ctx)
+	userID, _ := utils.UserIDFromContext(ctx)
 	_, err := rpc.AppClient.AddMessage(ctx, &rpcapp.AddMessageReq{
 		AppId:   appID,
 		UserId:  userID,
@@ -163,24 +179,14 @@ func addUserMessage(ctx context.Context, appID int64, content string) error {
 }
 
 func submitAI(ctx context.Context, appID int64) (bool, error) {
-	stream, err := rpc.AiClient.Chat(ctx, &rpcai.AiReq{ProjectId: projectID(appID)})
+	ctx = utils.WithIdentityMeta(ctx)
+	resp, err := rpc.AiClient.Chat(ctx, &rpcai.AiReq{ProjectId: projectID(appID)})
 	if err != nil {
+		klog.CtxErrorf(ctx, "submit ai task failed: app_id=%d err=%v", appID, err)
 		return false, err
 	}
-	defer stream.Close()
-
-	accepted := false
-	for {
-		resp, err := stream.Recv()
-		if err != nil {
-			if err == io.EOF {
-				break
-			}
-			return false, err
-		}
-		accepted = resp.GetAnswer() == "true"
-	}
-	return accepted, nil
+	klog.CtxInfof(ctx, "ai task submitted: app_id=%d", appID)
+	return resp.GetAnswer() == "true", nil
 }
 
 func addTaskEvent(ctx context.Context, appID int64, event aievent.TaskEvent) (string, error) {
@@ -194,7 +200,7 @@ func addTaskEvent(ctx context.Context, appID int64, event aievent.TaskEvent) (st
 	if event.CreatedAt == 0 {
 		event.CreatedAt = time.Now().UnixMilli()
 	}
-	return store.Add(ctx, aievent.StreamKey(projectID(appID)), event)
+	return store.Add(ctx, aievent.ControlKey(projectID(appID)), event)
 }
 
 func streamStore() (redisstream.Store, error) {
@@ -207,6 +213,14 @@ func stateStore() (*redisstate.Store, error) {
 
 func projectID(appID int64) string {
 	return strconv.FormatInt(appID, 10)
+}
+
+func hasPendingInterrupt(state aievent.ProjectState, targetID string) bool {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return false
+	}
+	return aievent.PendingInterruptsMatch(state.PendingInterrupts, targetID)
 }
 
 func toAIState(exists bool, state aievent.ProjectState) *lapp.AIState {
@@ -245,7 +259,45 @@ func toAIEvent(id string, event aievent.TaskEvent) *lapp.AIEvent {
 		Status:      event.Status,
 		PayloadJson: marshalPayload(event.Payload),
 		CreatedAt:   event.CreatedAt,
+		Questions:   toAIQuestions(event.Payload),
 	}
+}
+
+func toAIQuestions(payload map[string]any) []*lapp.AIQuestion {
+	raw, ok := payload["questions"]
+	if !ok {
+		return nil
+	}
+	data, err := json.Marshal(raw)
+	if err != nil {
+		return nil
+	}
+	var questions []struct {
+		Question string   `json:"question"`
+		Options  []string `json:"options"`
+	}
+	if err := json.Unmarshal(data, &questions); err != nil {
+		return nil
+	}
+	out := make([]*lapp.AIQuestion, 0, len(questions))
+	for _, question := range questions {
+		text := strings.TrimSpace(question.Question)
+		if text == "" {
+			continue
+		}
+		options := make([]string, 0, len(question.Options))
+		for _, option := range question.Options {
+			option = strings.TrimSpace(option)
+			if option != "" {
+				options = append(options, option)
+			}
+		}
+		out = append(out, &lapp.AIQuestion{
+			Question: text,
+			Options:  options,
+		})
+	}
+	return out
 }
 
 func marshalPayload(payload map[string]any) string {
@@ -257,20 +309,4 @@ func marshalPayload(payload map[string]any) string {
 		return ""
 	}
 	return string(data)
-}
-
-func contextUserID(ctx context.Context) (int64, bool) {
-	switch v := ctx.Value(utils.UserIdKey).(type) {
-	case int64:
-		return v, true
-	case int:
-		return int64(v), true
-	case float64:
-		return int64(v), true
-	case string:
-		id, err := strconv.ParseInt(v, 10, 64)
-		return id, err == nil
-	default:
-		return 0, false
-	}
 }

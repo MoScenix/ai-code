@@ -21,3 +21,6 @@ redis:
   username: ""
   password: ""
   db: 0
+
+ShareDir:
+  share_dir: /static/project/

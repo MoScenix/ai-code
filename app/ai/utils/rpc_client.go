@@ -7,7 +7,6 @@ import (
 	"github.com/MoScenix/ai-code/common/clientsuit"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app/appservice"
 	"github.com/cloudwego/kitex/client"
-	"github.com/cloudwego/kitex/pkg/transmeta"
 )
 
 var (
@@ -30,6 +29,5 @@ func newCommonClientOptions(enableGRPC bool) []client.Option {
 		EnableGRPC:         enableGRPC,
 	}.Options()
 
-	opts = append(opts, client.WithMetaHandler(transmeta.MetainfoClientHandler))
 	return opts
 }

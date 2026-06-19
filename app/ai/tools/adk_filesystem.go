@@ -39,20 +39,31 @@ func (b *ProjectFilesystemBackend) Read(ctx context.Context, req *adkfs.ReadRequ
 	if err != nil {
 		return nil, err
 	}
+	content := readLines(string(data), req.Offset, req.Limit)
 	return &adkfs.FileContent{
-		Content: readLines(string(data), req.Offset, req.Limit),
+		Content: content,
 	}, nil
 }
 
 func (b *ProjectFilesystemBackend) Write(ctx context.Context, req *adkfs.WriteRequest) error {
-	return b.store.WriteFile(ctx, req.FilePath, []byte(req.Content))
+	err := b.store.WriteFile(ctx, req.FilePath, []byte(req.Content))
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *ProjectFilesystemBackend) Edit(ctx context.Context, req *adkfs.EditRequest) error {
+	var err error
 	if req.ReplaceAll {
-		return b.replaceAll(ctx, req.FilePath, req.OldString, req.NewString)
+		err = b.replaceAll(ctx, req.FilePath, req.OldString, req.NewString)
+	} else {
+		err = b.store.EditFile(ctx, req.FilePath, req.OldString, req.NewString)
 	}
-	return b.store.EditFile(ctx, req.FilePath, req.OldString, req.NewString)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepRequest) ([]adkfs.GrepMatch, error) {
@@ -150,10 +161,10 @@ func (b *ProjectFilesystemBackend) replaceAll(ctx context.Context, path string, 
 func fileInfo(parent string, info filestore.ObjectInfo) adkfs.FileInfo {
 	path := info.Key
 	if info.Name != "" {
-		path = filepath.ToSlash(filepath.Join(parent, info.Name))
+		path = filepath.ToSlash(filepath.Join(cleanProjectPath(parent), info.Name))
 	}
 	return adkfs.FileInfo{
-		Path:       path,
+		Path:       cleanProjectPath(path),
 		IsDir:      info.IsDir,
 		Size:       info.Size,
 		ModifiedAt: info.ModTime.UTC().Format("2006-01-02T15:04:05Z"),

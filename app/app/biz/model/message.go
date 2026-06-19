@@ -12,6 +12,7 @@ type Message struct {
 	Content string `gorm:"type:text" json:"content"`
 	Role    string `gorm:"type:varchar(50)" json:"role"`
 	AppId   uint   `gorm:"type:int;index" json:"appId"`
+	IsFile  bool   `gorm:"type:boolean;default:false" json:"isFile"`
 }
 type MessageQuery struct {
 	ctx context.Context

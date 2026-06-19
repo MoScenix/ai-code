@@ -39,8 +39,8 @@
     <main class="flex-1 flex overflow-hidden p-4 gap-4">
 
       <section
-        class="flex-1 min-w-[400px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 space-y-6 scroll-smooth custom-scrollbar">
+        class="chat-shell flex-1 min-w-[400px] flex flex-col bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div ref="messagesContainer" class="chat-list flex-1 overflow-y-auto scroll-smooth custom-scrollbar">
           <div v-if="hasMoreHistory" class="flex justify-center">
             <a-button type="link" @click="loadMoreHistory" :loading="loadingHistory" size="small"
               class="text-slate-400 font-normal">
@@ -48,42 +48,114 @@
             </a-button>
           </div>
 
-          <div v-for="(message, index) in messages" :key="index"
-            class="animate-in fade-in slide-in-from-bottom-2 duration-300">
-            <div v-if="message.type === 'user'" class="flex justify-end gap-3 pl-12">
-              <div class="max-w-[78%] bg-gradient-to-br from-blue-600 to-blue-500 text-white px-4 py-3
-         rounded-2xl rounded-tr-md shadow-[0_10px_28px_rgba(37,99,235,0.25)]
-         text-[15px] leading-[1.75] tracking-[0.2px] whitespace-pre-wrap break-words">
-                {{ message.content }}
-              </div>
-
-              <a-avatar :src="loginUserStore.loginUser.userAvatar"
-                class="flex-shrink-0 border-2 border-white shadow-sm" />
-            </div>
-
-            <div v-else class="flex justify-start gap-3 pr-12">
-              <a-avatar :src="aiAvatar" class="flex-shrink-0 border border-slate-100 shadow-sm" />
-              <div class="flex-1">
-                <div class="max-w-[78%] bg-white text-slate-800 px-4 py-3 rounded-2xl rounded-tl-md
-         border border-slate-200 shadow-[0_10px_28px_rgba(15,23,42,0.06)]
-         text-[15px] leading-[1.75] tracking-[0.2px] relative break-words">
-                  <div class="custom-md markdown-content">
-                    <MarkdownRenderer v-if="message.content" :content="message.content" />
-                  </div>
-
-                  <div v-if="message.loading" class="flex items-center gap-2 py-2 text-slate-400">
-                    <a-spin size="small" />
-                    <span class="text-xs animate-pulse">正在构思方案...</span>
-                  </div>
-                </div>
-
-              </div>
-            </div>
+          <div v-if="!messages.length" class="empty-chat">
+            <div class="empty-title">开始一次修改</div>
+            <div class="empty-subtitle">描述你想改的内容，AI 会继续处理当前应用。</div>
           </div>
+
+          <template v-for="(item, index) in messages" :key="item.id || index">
+            <div v-if="item.type === 'system'" class="system-row">
+              <span>{{ item.content }}</span>
+            </div>
+
+            <div v-else-if="item.type === 'user'" class="message-row user-row">
+              <div class="user-message">
+                <div v-if="item.isPush" class="push-label">push</div>
+                <MarkdownRenderer class="message-markdown user-markdown" :content="item.content.trimEnd()" />
+              </div>
+            </div>
+
+            <div v-else class="message-row assistant-row">
+              <div class="assistant-message">
+                <div v-if="item.agent" class="agent-label">{{ item.agent }}</div>
+                <template v-if="item.parts?.length">
+                  <template v-for="part in item.parts" :key="part.id">
+                    <MarkdownRenderer
+                      v-if="part.type === 'text' && part.content"
+                      class="message-markdown assistant-markdown"
+                      :content="part.content.trimEnd()"
+                    />
+                    <div v-else-if="part.type === 'tool'" class="tool-list">
+                      <details class="tool-item">
+                        <summary>
+                          <span class="tool-corner"></span>
+                          <span class="tool-status">{{ part.tool.status === 'running' ? 'running' : part.tool.status === 'error' ? 'failed' : 'ran' }}</span>
+                          <span class="tool-name">{{ part.tool.name }}</span>
+                        </summary>
+                        <pre v-if="part.tool.args" class="tool-code">{{ formatJSON(part.tool.args) }}</pre>
+                        <pre v-if="part.tool.result" class="tool-code">{{ part.tool.result }}</pre>
+                      </details>
+                    </div>
+                  </template>
+                </template>
+                <template v-else>
+                  <MarkdownRenderer v-if="item.content" class="message-markdown assistant-markdown" :content="item.content.trimEnd()" />
+                  <div v-if="item.toolCalls?.length" class="tool-list">
+                    <details v-for="tool in item.toolCalls" :key="tool.id" class="tool-item">
+                      <summary>
+                        <span class="tool-corner"></span>
+                        <span class="tool-status">{{ tool.status === 'running' ? 'running' : tool.status === 'error' ? 'failed' : 'ran' }}</span>
+                        <span class="tool-name">{{ tool.name }}</span>
+                      </summary>
+                      <pre v-if="tool.args" class="tool-code">{{ formatJSON(tool.args) }}</pre>
+                      <pre v-if="tool.result" class="tool-code">{{ tool.result }}</pre>
+                    </details>
+                  </div>
+                </template>
+                <div v-if="item.loading && !item.content" class="assistant-loading">
+                  <span class="loading-dot"></span>
+                  <span>{{ aiState?.status || 'unknown' }}</span>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
 
-        <div class="p-4 bg-white border-t border-slate-100">
-          <div v-if="selectedElementInfo" class="mb-3">
+        <div class="composer-wrap">
+          <div v-if="currentQuestion && currentQuestionItem" class="question-panel">
+            <div class="question-title">
+              <span>{{ currentQuestion.agent || 'AI' }} 需要确认</span>
+              <span v-if="currentQuestionItems.length > 1" class="question-count">
+                {{ currentQuestionIndex + 1 }} / {{ currentQuestionItems.length }}
+              </span>
+            </div>
+            <div class="question-item">
+              <div class="question-content">{{ currentQuestionItem.question }}</div>
+              <div v-if="currentQuestionItem.options.length" class="question-options">
+                <button
+                  v-for="option in currentQuestionItem.options"
+                  :key="option"
+                  type="button"
+                  class="question-option"
+                  :class="{ 'question-option-active': currentAnswerSelection === option }"
+                  @click="selectAnswerOption(option)"
+                >
+                  {{ option }}
+                </button>
+              </div>
+            </div>
+            <a-textarea
+              v-model:value="answerInput"
+              :rows="2"
+              placeholder="输入其他回答，Enter 继续"
+              class="!rounded-xl !text-sm !border-slate-200"
+              @keydown.enter.prevent="submitQuestionStep"
+            />
+            <div class="flex justify-end gap-2 mt-2">
+              <a-button size="small" @click="currentQuestion = null">稍后</a-button>
+              <a-button
+                type="primary"
+                size="small"
+                :disabled="!canSubmitAnswer || answeringQuestion"
+                :loading="answeringQuestion"
+                @click="submitQuestionStep"
+              >
+                {{ isLastQuestion ? '发送' : '继续' }}
+              </a-button>
+            </div>
+          </div>
+
+          <div v-if="!currentQuestion && selectedElementInfo" class="mb-3">
             <div
               class="flex items-center justify-between bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 animate-in zoom-in-95">
               <div class="flex items-center gap-2 overflow-hidden">
@@ -98,28 +170,20 @@
             </div>
           </div>
 
-          <div class="relative rounded-xl border-2 transition-all p-1" :class="[
-            isEditMode ? 'border-amber-400 bg-amber-50/20' : 'border-slate-200 focus-within:border-blue-500 focus-within:ring-4 focus-within:ring-blue-500/10'
-          ]">
-            <a-textarea v-model:value="userInput" :placeholder="getInputPlaceholder()" :rows="4"
-              :disabled="isGenerating || (!isOwner && !isAdmin)" :bordered="false"
-              class="!bg-transparent !resize-none !text-slate-700 !shadow-none" @keydown.enter.prevent="sendMessage" />
-
-            <div class="flex items-center justify-between px-2 pb-1">
-              <div class="text-[11px] text-slate-400 flex items-center gap-1">
-                <span v-if="isOwner">回车键发送，Shift+Enter 换行</span>
-                <span v-else class="text-amber-500">
-                  <LockOutlined /> 访客模式不可编辑
-                </span>
-              </div>
-              <a-button type="primary" @click="sendMessage" :loading="isGenerating"
-                :disabled="!isOwner || !userInput.trim()"
-                class="!h-9 !w-9 !flex !items-center !justify-center !rounded-lg !bg-blue-600 shadow-lg shadow-blue-500/20">
-                <template #icon>
-                  <SendOutlined />
-                </template>
-              </a-button>
-            </div>
+          <PromptInputBox
+            v-if="!currentQuestion"
+            v-model="userInput"
+            :is-loading="isGenerating"
+            :disabled="!isOwner && !isAdmin"
+            :placeholder="getInputPlaceholder()"
+            @send="handleSendMessage"
+            @cancel="cancelCurrentTask"
+          />
+          <div v-if="!currentQuestion" class="composer-hint">
+            <span v-if="isOwner">Enter 发送，Shift+Enter 换行；运行中输入内容会追加给当前任务</span>
+            <span v-else class="text-amber-500">
+              <LockOutlined /> 访客模式不可编辑
+            </span>
           </div>
         </div>
       </section>
@@ -142,7 +206,7 @@
           </div>
 
           <ReloadOutlined class="text-[10px] text-slate-400 cursor-pointer hover:text-blue-500 transition-colors"
-            @click="updatePreview" />
+            @click="updatePreview(true)" />
 
 
 
@@ -206,7 +270,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, nextTick, onUnmounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
@@ -215,19 +279,23 @@ import { listAppChatHistory } from '@/api/chatHistoryController'
 import request from '@/request'
 
 import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
+import PromptInputBox from '@/components/PromptInputBox.vue'
 import AppDetailModal from '@/components/AppDetailModal.vue'
 import DeploySuccessModal from '@/components/DeploySuccessModal.vue'
-import aiAvatar from '@/assets/aiAvatar.png'
-import { API_BASE_URL, getStaticPreviewUrl } from '@/config/env'
+import { getStaticPreviewUrl } from '@/config/env'
 import { VisualEditor, type ElementInfo } from '@/utils/visualEditor'
+import { useAIEvents, type AIMessage } from '@/composables/useAIEvents'
 
 import {
   CloudUploadOutlined,
-  SendOutlined,
+  CloseCircleFilled,
   ExportOutlined,
   InfoCircleOutlined,
   DownloadOutlined,
   EditOutlined,
+  GlobalOutlined,
+  LockOutlined,
+  ReloadOutlined,
 } from '@ant-design/icons-vue'
 
 const route = useRoute()
@@ -238,18 +306,25 @@ const loginUserStore = useLoginUserStore()
 const appInfo = ref<API.AppVO>()
 const appId = ref<any>()
 
-// 对话相关
-interface Message {
-  type: 'user' | 'ai'
-  content: string
-  loading?: boolean
-  createTime?: string
-}
-
-const messages = ref<Message[]>([])
 const userInput = ref('')
-const isGenerating = ref(false)
+const answerInput = ref('')
+const answerSelections = ref<Record<number, string>>({})
+const currentQuestionIndex = ref(0)
+const answeringQuestion = ref(false)
 const messagesContainer = ref<HTMLElement>()
+
+const {
+  messages,
+  aiState,
+  isGenerating,
+  currentQuestion,
+  sendMessage,
+  pushMessage,
+  answerQuestion,
+  cancelCurrentTask,
+  loadInitialState,
+  stop: stopAI,
+} = useAIEvents(appId)
 
 // 对话历史相关
 const loadingHistory = ref(false)
@@ -287,6 +362,27 @@ const isAdmin = computed(() => {
   return loginUserStore.loginUser.userRole === 'admin'
 })
 
+const currentQuestionItems = computed(() => {
+  if (!currentQuestion.value) return []
+  return currentQuestion.value.questions.length
+    ? currentQuestion.value.questions
+    : [{ question: currentQuestion.value.content, options: [] }]
+})
+
+const currentQuestionItem = computed(() => currentQuestionItems.value[currentQuestionIndex.value])
+
+const currentAnswerSelection = computed(() => {
+  return answerSelections.value[currentQuestionIndex.value] || ''
+})
+
+const isLastQuestion = computed(() => {
+  return currentQuestionIndex.value >= currentQuestionItems.value.length - 1
+})
+
+const canSubmitAnswer = computed(() => {
+  return Boolean(answerInput.value.trim() || currentAnswerSelection.value.trim())
+})
+
 // 应用详情相关
 const appDetailVisible = ref(false)
 
@@ -314,8 +410,9 @@ const loadChatHistory = async (isLoadMore = false) => {
       const chatHistories = res.data.data.records || []
       if (chatHistories.length > 0) {
         // 将对话历史转换为消息格式，并按时间正序排列（老消息在前）
-        const historyMessages: Message[] = chatHistories
+        const historyMessages: AIMessage[] = chatHistories
           .map((chat) => ({
+            id: chat.id?.toString() || `${chat.messageType}-${chat.createTime || Math.random()}`,
             type: (chat.messageType === 'user' ? 'user' : 'ai') as 'user' | 'ai',
             content: chat.message || '',
             createTime: chat.createTime,
@@ -388,38 +485,13 @@ const fetchAppInfo = async () => {
   }
 }
 
-// 发送初始消息
 const sendInitialMessage = async (prompt: string) => {
-  // 添加用户消息
-  messages.value.push({
-    type: 'user',
-    content: prompt,
-  })
-
-  // 添加AI消息占位符
-  const aiMessageIndex = messages.value.length
-  messages.value.push({
-    type: 'ai',
-    content: '',
-    loading: true,
-  })
-
-  await nextTick()
-  scrollToBottom()
-
-  // 开始生成
-  isGenerating.value = true
-  await generateCode(prompt, aiMessageIndex)
+  await handleSendMessage(prompt)
 }
 
-// 发送消息
-const sendMessage = async () => {
-  if (!userInput.value.trim() || isGenerating.value) {
-    return
-  }
-
-  let msg = userInput.value.trim()
-  // 如果有选中的元素，将元素信息添加到提示词中
+const handleSendMessage = async (rawMessage: string) => {
+  if (!rawMessage.trim()) return
+  let msg = rawMessage.trim()
   if (selectedElementInfo.value) {
     let elementContext = `\n\n选中元素信息：`
     if (selectedElementInfo.value.pagePath) {
@@ -430,148 +502,103 @@ const sendMessage = async () => {
       elementContext += `\n- 当前内容: ${selectedElementInfo.value.textContent.substring(0, 100)}`
     }
     msg += elementContext
+    clearSelectedElement()
+    if (isEditMode.value) toggleEditMode()
+  }
+
+  const ok = isGenerating.value ? await pushMessage(msg) : await sendMessage(msg)
+  if (!ok) {
+    message.error(isGenerating.value ? '追加失败' : '提交失败')
+    return
   }
   userInput.value = ''
-
-  // 添加用户消息（包含元素信息）
-  messages.value.push({
-    type: 'user',
-    content: msg,
-  })
-
-  // 发送消息后，清除选中元素并退出编辑模式
-  if (selectedElementInfo.value) {
-    clearSelectedElement()
-    if (isEditMode.value) {
-      toggleEditMode()
-    }
-  }
-
-  // 添加AI消息占位符
-  const aiMessageIndex = messages.value.length
-  messages.value.push({
-    type: 'ai',
-    content: '',
-    loading: true,
-  })
-
-  await nextTick()
-  scrollToBottom()
-
-  // 开始生成
-  isGenerating.value = true
-  await generateCode(msg, aiMessageIndex)
+  updatePreview()
 }
 
-// 提交 AI 任务 - 后续消息由刷新/事件读取链路同步
-const generateCode = async (userMessage: string, aiMessageIndex: number) => {
-  let eventSource: EventSource | null = null
-  let streamCompleted = false
+const selectAnswerOption = (option: string) => {
+  answerSelections.value = {
+    ...answerSelections.value,
+    [currentQuestionIndex.value]: option,
+  }
+}
 
+const currentStepAnswer = () => {
+  return (answerInput.value.trim() || currentAnswerSelection.value.trim()).trim()
+}
+
+const buildAnswerContent = (answers = answerSelections.value) => {
+  const selected = currentQuestionItems.value
+    .map((question, index) => {
+      const value = answers[index]?.trim()
+      if (!value) return ''
+      if (currentQuestionItems.value.length === 1) return value
+      return `问题：${question.question}\n回答：${value}`
+    })
+    .filter(Boolean)
+
+  return selected.join('\n\n').trim()
+}
+
+const submitQuestionStep = async () => {
+  const stepAnswer = currentStepAnswer()
+  if (!stepAnswer) return
+  const nextSelections = {
+    ...answerSelections.value,
+    [currentQuestionIndex.value]: stepAnswer,
+  }
+  answerSelections.value = nextSelections
+  answerInput.value = ''
+
+  if (!isLastQuestion.value) {
+    currentQuestionIndex.value += 1
+    return
+  }
+
+  const answer = buildAnswerContent(nextSelections)
+  if (!answer) return
+  answeringQuestion.value = true
   try {
-    // 获取 axios 配置的 baseURL
-    const baseURL = request.defaults.baseURL || API_BASE_URL
-
-    // 构建URL参数
-    const params = new URLSearchParams({
-      appId: appId.value || '',
-      message: userMessage,
-    })
-
-    const url = `${baseURL}/app/chat/gen/code?${params}`
-
-    // 创建 EventSource 连接
-    eventSource = new EventSource(url, {
-      withCredentials: true,
-    })
-
-    eventSource.addEventListener('queued', function () {
-      if (streamCompleted) return
-
-      messages.value[aiMessageIndex].content = '任务已入队，AI 正在后台处理。'
-      messages.value[aiMessageIndex].loading = false
-      message.success('任务已提交')
-      scrollToBottom()
-    })
-
-    eventSource.onmessage = function () {
-      // 当前接口只返回提交结果，AI 事件流后续由独立读取链路处理。
+    const ok = await answerQuestion(answer)
+    if (!ok) {
+      message.error('回答提交失败')
+      return
     }
-
-    // 处理done事件
-    eventSource.addEventListener('done', function () {
-      if (streamCompleted) return
-
-      streamCompleted = true
-      isGenerating.value = false
-      eventSource?.close()
-
-      await fetchAppInfo()
-      updatePreview()
-    })
-
-    // 处理business-error事件（后端限流等错误）
-    eventSource.addEventListener('business-error', function (event: MessageEvent) {
-      if (streamCompleted) return
-
-      try {
-        const errorData = JSON.parse(event.data)
-        console.error('SSE业务错误事件:', errorData)
-
-        // 显示具体的错误信息
-        const errorMessage = errorData.message || '生成过程中出现错误'
-        messages.value[aiMessageIndex].content = `❌ ${errorMessage}`
-        messages.value[aiMessageIndex].loading = false
-        message.error(errorMessage)
-
-        streamCompleted = true
-        isGenerating.value = false
-        eventSource?.close()
-      } catch (parseError) {
-        console.error('解析错误事件失败:', parseError, '原始数据:', event.data)
-        handleError(new Error('服务器返回错误'), aiMessageIndex)
-      }
-    })
-
-    // 处理错误
-    eventSource.onerror = function () {
-      if (streamCompleted || !isGenerating.value) return
-      // 检查是否是正常的连接关闭
-      if (eventSource?.readyState === EventSource.CONNECTING) {
-        streamCompleted = true
-        isGenerating.value = false
-        eventSource?.close()
-
-        await fetchAppInfo()
-        updatePreview()
-      } else {
-        handleError(new Error('SSE连接错误'), aiMessageIndex)
-      }
-    }
-  } catch (error) {
-    console.error('创建 EventSource 失败：', error)
-    handleError(error, aiMessageIndex)
+    currentQuestion.value = null
+    answerSelections.value = {}
+  } finally {
+    answeringQuestion.value = false
   }
-}
-
-// 错误处理函数
-const handleError = (error: unknown, aiMessageIndex: number) => {
-  console.error('生成代码失败：', error)
-  messages.value[aiMessageIndex].content = '抱歉，生成过程中出现了错误，请重试。'
-  messages.value[aiMessageIndex].loading = false
-  message.error('生成失败，请重试')
-  isGenerating.value = false
 }
 
 // 更新预览（已统一生成类型：不再依赖 codeGenType）
-const updatePreview = () => {
+const updatePreview = (cacheBust = false) => {
   if (appId.value) {
     // 统一由后端/环境配置决定预览入口
-    const newPreviewUrl = getStaticPreviewUrl(appId.value)
+    const baseUrl = getStaticPreviewUrl(appId.value)
+    const newPreviewUrl = cacheBust ? `${baseUrl}?t=${Date.now()}` : baseUrl
     previewUrl.value = newPreviewUrl
     previewReady.value = true
   }
 }
+
+watch(
+  () => aiState.value?.status,
+  (status, previous) => {
+    if (status === 'done' && previous !== 'done') {
+      updatePreview(true)
+    }
+  },
+)
+
+watch(
+  () => currentQuestion.value?.id,
+  () => {
+    currentQuestionIndex.value = 0
+    answerInput.value = ''
+    answerSelections.value = {}
+    answeringQuestion.value = false
+  },
+)
 
 // 滚动到底部
 const scrollToBottom = () => {
@@ -579,6 +606,14 @@ const scrollToBottom = () => {
     messagesContainer.value.scrollTop = messagesContainer.value.scrollHeight
   }
 }
+
+watch(
+  () => {
+    const last = messages.value[messages.value.length - 1]
+    return `${messages.value.length}:${last?.id || ''}:${last?.content?.length || 0}:${last?.toolCalls?.length || 0}`
+  },
+  () => nextTick(scrollToBottom),
+)
 
 // 下载代码
 const downloadCode = async () => {
@@ -634,6 +669,7 @@ const deployApp = async () => {
     if (res.data.code === 0 && res.data.data) {
       const deployPath = res.data.data
       deployUrl.value = new URL(deployPath, window.location.origin).toString()
+      await fetchAppInfo()
       deployModalVisible.value = true
       message.success('部署成功')
     } else {
@@ -749,19 +785,30 @@ const getInputPlaceholder = () => {
   return '请描述你想生成的网站，越详细效果越好哦'
 }
 
-// 页面加载时获取应用信息
-onMounted(() => {
-  fetchAppInfo()
+const formatJSON = (value?: string) => {
+  if (!value) return ''
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2)
+  } catch {
+    return value
+  }
+}
 
-  // 监听 iframe 消息
-  window.addEventListener('message', (event) => {
-    visualEditor.handleIframeMessage(event)
-  })
+const handleWindowMessage = (event: MessageEvent) => {
+  visualEditor.handleIframeMessage(event)
+}
+
+// 页面加载时获取应用信息
+onMounted(async () => {
+  await fetchAppInfo()
+  await loadInitialState()
+  window.addEventListener('message', handleWindowMessage)
 })
 
 // 清理资源
 onUnmounted(() => {
-  // EventSource 会在组件卸载时自动清理
+  stopAI()
+  window.removeEventListener('message', handleWindowMessage)
 })
 </script>
 
@@ -783,5 +830,271 @@ onUnmounted(() => {
   background: #cbd5e1;
 }
 
-/* 覆盖 Ant Design 部分全局样式 */
+.chat-list {
+  padding: 22px 22px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.empty-chat {
+  min-height: 320px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  user-select: none;
+}
+
+.empty-title {
+  color: #111827;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.empty-subtitle {
+  margin-top: 6px;
+  color: #9ca3af;
+  font-size: 13px;
+}
+
+.system-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #9ca3af;
+  font-size: 12px;
+}
+
+.system-row::before,
+.system-row::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: #f1f5f9;
+}
+
+.message-row {
+  display: flex;
+}
+
+.user-row {
+  justify-content: flex-end;
+}
+
+.assistant-row {
+  justify-content: flex-start;
+}
+
+.user-message {
+  max-width: 86%;
+  padding: 10px 14px;
+  border-radius: 18px;
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.assistant-message {
+  max-width: 94%;
+  color: #111827;
+}
+
+.push-label,
+.agent-label {
+  margin-bottom: 4px;
+  color: #9ca3af;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+}
+
+.message-markdown {
+  font-size: 14px;
+}
+
+.user-markdown {
+  line-height: 1.55;
+}
+
+.assistant-markdown {
+  line-height: 1.7;
+}
+
+.assistant-loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #9ca3af;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.loading-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #9ca3af;
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 1; }
+}
+
+.tool-list {
+  margin-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.tool-item {
+  color: #6b7280;
+  font-size: 12px;
+}
+
+.tool-item summary {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.tool-item summary::-webkit-details-marker {
+  display: none;
+}
+
+.tool-corner {
+  width: 12px;
+  height: 13px;
+  border-left: 1px solid #d1d5db;
+  border-bottom: 1px solid #d1d5db;
+  border-bottom-left-radius: 5px;
+}
+
+.tool-status {
+  color: #9ca3af;
+}
+
+.tool-name {
+  color: #374151;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.tool-code {
+  margin: 7px 0 2px 20px;
+  max-height: 180px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  padding: 8px 10px;
+  color: #374151;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.composer-wrap {
+  padding: 14px 16px 12px;
+  background: #fff;
+  border-top: 1px solid #f1f5f9;
+}
+
+.question-panel {
+  margin-bottom: 12px;
+  padding: 14px;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.05);
+}
+
+.question-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 8px;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.question-count {
+  color: #9ca3af;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-weight: 500;
+}
+
+.question-item {
+  margin-bottom: 12px;
+}
+
+.question-content {
+  color: #111827;
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.question-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.question-option {
+  max-width: 100%;
+  min-height: 30px;
+  padding: 5px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  background: #f9fafb;
+  color: #374151;
+  font-size: 12px;
+  white-space: normal;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.question-option:hover {
+  border-color: #cbd5e1;
+  background: #f3f4f6;
+}
+
+.question-option-active {
+  border-color: #2563eb !important;
+  color: #1d4ed8 !important;
+  background: #eff6ff !important;
+}
+
+.composer-hint {
+  margin-top: 8px;
+  padding: 0 4px;
+  color: #9ca3af;
+  font-size: 11px;
+}
+
+:deep(.message-markdown .custom-md p) {
+  margin: 0;
+}
+
+:deep(.message-markdown .custom-md p + p) {
+  margin-top: 0.6em;
+}
+
+:deep(.message-markdown .custom-md pre) {
+  margin: 10px 0;
+  border-radius: 8px;
+  background: #f8fafc;
+}
+
+:deep(.message-markdown .custom-md code) {
+  font-size: 12px;
+}
 </style>

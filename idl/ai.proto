@@ -13,5 +13,5 @@ message AiResp {
 }
 
 service AiService {
-  rpc Chat(AiReq) returns (stream AiResp);
+  rpc Chat(AiReq) returns (AiResp);
 }

@@ -24,6 +24,7 @@ func (s CommonGrpcClientSuite) Options() []client.Option {
 	opts := []client.Option{
 		client.WithResolver(r),
 		client.WithMetaHandler(transmeta.ClientHTTP2Handler),
+		client.WithMetaHandler(transmeta.MetainfoClientHandler),
 	}
 	if s.EnableGRPC {
 		opts = append(opts, client.WithTransportProtocol(transport.GRPC))

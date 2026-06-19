@@ -1,0 +1,23 @@
+# docker_files/DockerFile.document
+FROM golang:1.25.5
+
+WORKDIR /usr/src/gomall
+
+ENV GOPROXY=https://goproxy.cn,direct
+ENV GOSUMDB=sum.golang.google.cn
+ENV GOTOOLCHAIN=local
+ENV GOWORK=off
+
+COPY app/document/go.mod app/document/go.sum ./app/document/
+COPY rpc_gen ./rpc_gen
+COPY common ./common
+
+RUN cd app/document && go mod download && go mod verify
+
+COPY app/document ./app/document
+
+RUN cd app/document && go build -mod=readonly -v -o server
+
+WORKDIR /usr/src/gomall/app/document
+EXPOSE 8888
+CMD ["./server"]

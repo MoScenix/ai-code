@@ -18,3 +18,22 @@ redis:
   username: ""
   password: ""
   db: 0
+consul:
+  address: "127.0.0.1:8500"
+
+static:
+  route: "/static"
+  root: "/static"
+  url_prefix: "/static"
+  project: "project"
+  avatar: "avatar"
+  cover: "cover"
+
+deploy:
+  root: "/static/deploy"
+  url_prefix: "/static/deploy"
+
+file:
+  big_threshold_bytes: 12000
+  chunk_min_size: 200
+  chunk_max_size: 400

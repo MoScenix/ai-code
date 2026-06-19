@@ -3,8 +3,10 @@ FROM golang:1.25.5
 
 WORKDIR /usr/src/gomall
 
-ENV GOPROXY=https://goproxy.cn,https://proxy.golang.org,direct
+ENV GOPROXY=https://goproxy.cn,direct
 ENV GOSUMDB=sum.golang.google.cn
+ENV GOTOOLCHAIN=local
+ENV GOWORK=off
 
 COPY app/user/go.mod app/user/go.sum ./app/user/
 COPY rpc_gen ./rpc_gen
@@ -14,8 +16,8 @@ RUN cd app/user && go mod download && go mod verify
 
 COPY app/user ./app/user
 
-RUN cd app/user && go build -v -o server
+RUN cd app/user && go build -mod=readonly -v -o server
 
 WORKDIR /usr/src/gomall/app/user
-EXPOSE 8080
+EXPOSE 8888
 CMD ["./server"]

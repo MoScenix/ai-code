@@ -62,7 +62,7 @@ func Resume(ctx context.Context) error {
 	if len(state.PendingInterrupts) == 0 || state.PendingInterrupts[0].ID == "" {
 		return ErrNoInterruptedCheckpoint
 	}
-	answer, err := loadResumeAnswer(ctx, state)
+	answer, err := loadResumeAnswer(ctx, state, state.PendingInterrupts[0].ID)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func Resume(ctx context.Context) error {
 	return handleGraphResult(ctx, err)
 }
 
-func loadResumeAnswer(ctx context.Context, state aievent.ProjectState) (agent.DesignerAnswer, error) {
+func loadResumeAnswer(ctx context.Context, state aievent.ProjectState, targetID string) (agent.DesignerAnswer, error) {
 	streamStore, ok := utils.StreamStoreFromContext(ctx)
 	if !ok || streamStore == nil {
 		return agent.DesignerAnswer{}, fmt.Errorf("graph resume requires stream store")
@@ -88,25 +88,25 @@ func loadResumeAnswer(ctx context.Context, state aievent.ProjectState) (agent.De
 	if !ok || projectID == "" {
 		return agent.DesignerAnswer{}, fmt.Errorf("graph resume requires project id")
 	}
-	targetID := state.PendingInterrupts[0].ID
-	lastID := state.LastEventID
+	lastID := resumeEventCursor(state)
 	if strings.TrimSpace(lastID) == "" {
 		lastID = "0"
 	}
 
-	messages, err := streamStore.Read(ctx, aievent.StreamKey(projectID), lastID, redisstream.ReadOptions{
+	messages, err := streamStore.Read(ctx, aievent.ControlKey(projectID), lastID, redisstream.ReadOptions{
 		Block: time.Second,
 		Count: 32,
 	})
 	if err != nil {
 		return agent.DesignerAnswer{}, err
 	}
+	targetIDs := resumeTargetIDs(state, targetID)
 	for _, msg := range messages {
 		event, err := redisstream.Decode[aievent.TaskEvent](msg)
 		if err != nil || event.Type != aievent.EventAnswer {
 			continue
 		}
-		if strings.TrimSpace(event.TargetID) != targetID {
+		if len(targetIDs) > 0 && !targetIDs[strings.TrimSpace(event.TargetID)] {
 			continue
 		}
 		return agent.DesignerAnswer{
@@ -115,6 +115,20 @@ func loadResumeAnswer(ctx context.Context, state aievent.ProjectState) (agent.De
 		}, nil
 	}
 	return agent.DesignerAnswer{}, ErrResumeAnswerNotFound
+}
+
+func resumeTargetIDs(state aievent.ProjectState, targetID string) map[string]bool {
+	ids := make(map[string]bool)
+	if targetID = strings.TrimSpace(targetID); targetID != "" {
+		ids[targetID] = true
+	}
+	if len(state.PendingInterrupts) == 0 {
+		return ids
+	}
+	for id := range aievent.PendingInterruptTargetIDs(state.PendingInterrupts[0]) {
+		ids[id] = true
+	}
+	return ids
 }
 
 func handleGraphResult(ctx context.Context, err error) error {
@@ -144,15 +158,26 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 
 	interrupts := make([]aievent.PendingInterrupt, 0, len(info.InterruptContexts))
 	for _, interruptCtx := range info.InterruptContexts {
+		payload := map[string]any{
+			"address":           interruptCtx.Address.String(),
+			aievent.PayloadInfo: interruptCtx.Info,
+			"is_root_cause":     interruptCtx.IsRootCause,
+		}
+		infoPayload, _ := interruptCtx.Info.(map[string]any)
+		if designerLastID := aievent.DesignerLastID(infoPayload); designerLastID != "" {
+			payload[aievent.PayloadLastEventID] = designerLastID
+		}
+		if adkInterruptID := aievent.ADKInterruptID(infoPayload); adkInterruptID != "" {
+			payload[aievent.PayloadADKInterruptID] = adkInterruptID
+		}
+		if controlCursor := aievent.ControlCursor(infoPayload); controlCursor != "" {
+			payload[aievent.PayloadControlCursor] = controlCursor
+		}
 		interrupts = append(interrupts, aievent.PendingInterrupt{
 			ID:      interruptCtx.ID,
 			Agent:   designerNode,
 			Content: fmt.Sprint(interruptCtx.Info),
-			Payload: map[string]any{
-				"address":       interruptCtx.Address.String(),
-				"info":          interruptCtx.Info,
-				"is_root_cause": interruptCtx.IsRootCause,
-			},
+			Payload: payload,
 		})
 	}
 	if len(interrupts) == 0 {
@@ -173,6 +198,25 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 		IsCancelled:       utils.IsCancelled(ctx),
 		UpdatedAt:         time.Now().UnixMilli(),
 	})
+}
+
+func resumeEventCursor(state aievent.ProjectState) string {
+	if len(state.PendingInterrupts) > 0 {
+		payload := state.PendingInterrupts[0].Payload
+		if value := aievent.ControlCursor(payload); value != "" {
+			return value
+		}
+		if value := aievent.PayloadString(payload, aievent.PayloadLastEventID); value != "" {
+			return value
+		}
+		if value := aievent.PayloadString(payload, aievent.PayloadDesignerLastID); value != "" {
+			return value
+		}
+		if value := aievent.DesignerLastID(aievent.NestedPayload(payload, aievent.PayloadInfo)); value != "" {
+			return value
+		}
+	}
+	return state.LastEventID
 }
 
 func loadInterruptedGraphState(ctx context.Context) (aievent.ProjectState, error) {

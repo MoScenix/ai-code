@@ -4,6 +4,7 @@ use (
 	./app/ai
 	./app/app
 	./app/bff
+	./app/document
 	./app/user
 	./common
 	./rpc_gen

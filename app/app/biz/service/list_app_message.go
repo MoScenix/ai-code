@@ -51,6 +51,7 @@ func (s *ListAppMessageService) Run(req *app.ListAppMessageReq) (resp *app.ListA
 			CreateTime: v.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdateTime: v.CreatedAt.Format("2006-01-02 15:04:05"),
 			UserId:     int64(Appres.UserId),
+			IsFile:     v.IsFile,
 		})
 	}
 	return resp, nil

@@ -19,6 +19,7 @@ import (
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/hertz/pkg/common/utils"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/hertz-contrib/cors"
 	"github.com/hertz-contrib/gzip"
 	"github.com/hertz-contrib/logger/accesslog"
@@ -28,6 +29,7 @@ import (
 	"github.com/hertz-contrib/sessions"
 	"github.com/hertz-contrib/sessions/redis"
 	"github.com/joho/godotenv"
+	kitexlogrus "github.com/kitex-contrib/obs-opentelemetry/logging/logrus"
 	"go.uber.org/zap/zapcore"
 	"gopkg.in/natefinch/lumberjack.v2"
 )
@@ -51,14 +53,17 @@ func main() {
 	h.GET("/ping", func(c context.Context, ctx *app.RequestContext) {
 		ctx.JSON(consts.StatusOK, utils.H{"ping": "pong"})
 	})
-	h.Static("/static", "/")
+	h.StaticFS(conf.StaticRoute(), &app.FS{
+		Root:        conf.StaticRoot(),
+		PathRewrite: app.NewPathSlashesStripper(conf.StaticRouteStripSlashes()),
+	})
 	router.GeneratedRegister(h)
 
 	h.Spin()
 }
 
 func registerMiddleware(h *server.Hertz, traceCfg *hertztracing.Config) {
-	store, err := redis.NewStore(100, "tcp", conf.GetConf().Redis.Address, "", []byte(os.Getenv("SESSION_SECRET")))
+	store, err := redis.NewStore(100, "tcp", conf.GetConf().Redis.Address, conf.GetConf().Redis.Password, []byte(os.Getenv("SESSION_SECRET")))
 	if err != nil {
 		panic(err)
 	}
@@ -73,6 +78,8 @@ func registerMiddleware(h *server.Hertz, traceCfg *hertztracing.Config) {
 	logger := hertzlogrus.NewLogger()
 	hlog.SetLogger(logger)
 	hlog.SetLevel(conf.LogLevel())
+	klog.SetLogger(kitexlogrus.NewLogger())
+	klog.SetLevel(klog.Level(conf.LogLevel()))
 	asyncWriter := &zapcore.BufferedWriteSyncer{
 		WS: zapcore.AddSync(&lumberjack.Logger{
 			Filename:   conf.GetConf().Hertz.LogFileName,
@@ -83,6 +90,7 @@ func registerMiddleware(h *server.Hertz, traceCfg *hertztracing.Config) {
 		FlushInterval: time.Minute,
 	}
 	hlog.SetOutput(asyncWriter)
+	klog.SetOutput(asyncWriter)
 	h.OnShutdown = append(h.OnShutdown, func(ctx context.Context) {
 		asyncWriter.Sync()
 	})

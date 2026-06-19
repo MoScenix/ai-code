@@ -93,7 +93,14 @@ func (s *ProjectStore) List(ctx context.Context, dir string) ([]filestore.Object
 	if err != nil {
 		return nil, err
 	}
-	return s.files.List(ctx, key)
+	infos, err := s.files.List(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	for i := range infos {
+		infos[i].Key = s.relativeKey(infos[i].Key)
+	}
+	return infos, nil
 }
 
 func (s *ProjectStore) Stat(ctx context.Context, path string) (filestore.ObjectInfo, error) {
@@ -101,7 +108,12 @@ func (s *ProjectStore) Stat(ctx context.Context, path string) (filestore.ObjectI
 	if err != nil {
 		return filestore.ObjectInfo{}, err
 	}
-	return s.files.Stat(ctx, key)
+	info, err := s.files.Stat(ctx, key)
+	if err != nil {
+		return filestore.ObjectInfo{}, err
+	}
+	info.Key = s.relativeKey(info.Key)
+	return info, nil
 }
 
 func (s *ProjectStore) Commit(ctx context.Context) error {
@@ -110,7 +122,7 @@ func (s *ProjectStore) Commit(ctx context.Context) error {
 
 func (s *ProjectStore) key(path string, allowRoot bool) (string, error) {
 	path = strings.TrimSpace(path)
-	if path == "" {
+	if isRootPath(path) {
 		if !allowRoot {
 			return "", filestore.ErrInvalidKey
 		}
@@ -120,6 +132,15 @@ func (s *ProjectStore) key(path string, allowRoot bool) (string, error) {
 		return "", filestore.ErrInvalidKey
 	}
 	return filepath.ToSlash(filepath.Join(s.projectID, path)), nil
+}
+
+func (s *ProjectStore) relativeKey(key string) string {
+	key = strings.TrimSpace(filepath.ToSlash(key))
+	projectID := strings.TrimSpace(filepath.ToSlash(s.projectID))
+	if key == projectID {
+		return ""
+	}
+	return strings.TrimPrefix(key, projectID+"/")
 }
 
 func invalidRelativePath(path string) bool {
@@ -134,4 +155,9 @@ func invalidRelativePath(path string) bool {
 		}
 	}
 	return false
+}
+
+func isRootPath(path string) bool {
+	path = strings.TrimSpace(filepath.ToSlash(path))
+	return path == "" || path == "." || path == "/"
 }

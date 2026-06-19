@@ -2,8 +2,6 @@ package cache
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"os"
@@ -18,8 +16,7 @@ import (
 )
 
 const (
-	cacheSuffix = ".cache"
-	metaSuffix  = ".meta.json"
+	metaSuffix = ".meta.json"
 )
 
 type LocalCacheStore struct {
@@ -109,6 +106,9 @@ func (s *LocalCacheStore) Write(ctx context.Context, key string, data []byte) er
 	defer s.mu.Unlock()
 
 	obj := s.objectForKey(key)
+	if err := s.validateObjectPath(obj); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(filepath.Dir(obj.cachePath), 0755); err != nil {
 		return err
 	}
@@ -291,20 +291,37 @@ func (s *LocalCacheStore) Flush(ctx context.Context, path string) error {
 }
 
 func (s *LocalCacheStore) objectForKey(key string) cachedObject {
-	sum := sha256.Sum256([]byte(cleanKey(key)))
-	hash := hex.EncodeToString(sum[:])
-	dir := filepath.Join(s.cacheDir, hash[:2], hash[2:4])
+	key = cleanKey(key)
+	cachePath := filepath.Join(s.cacheDir, filepath.FromSlash(key))
 	return cachedObject{
-		metaPath:  filepath.Join(dir, hash+metaSuffix),
-		cachePath: filepath.Join(dir, hash+cacheSuffix),
+		metaPath:  cachePath + metaSuffix,
+		cachePath: cachePath,
 		meta: objectMeta{
-			Key: cleanKey(key),
+			Key: key,
 		},
 	}
 }
 
+func (s *LocalCacheStore) validateObjectPath(obj cachedObject) error {
+	cacheDir, err := filepath.Abs(s.cacheDir)
+	if err != nil {
+		return err
+	}
+	cachePath, err := filepath.Abs(obj.cachePath)
+	if err != nil {
+		return err
+	}
+	if cachePath == cacheDir || !strings.HasPrefix(cachePath, cacheDir+string(os.PathSeparator)) {
+		return filestore.ErrInvalidKey
+	}
+	return nil
+}
+
 func (s *LocalCacheStore) loadObject(key string) (cachedObject, error) {
 	obj := s.objectForKey(key)
+	if err := s.validateObjectPath(obj); err != nil {
+		return cachedObject{}, err
+	}
 	data, err := os.ReadFile(obj.metaPath)
 	if errors.Is(err, os.ErrNotExist) {
 		return cachedObject{}, filestore.ErrNotFound
@@ -339,7 +356,11 @@ func (s *LocalCacheStore) saveMeta(obj cachedObject) error {
 func (s *LocalCacheStore) removeObject(key string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	return s.removeObjectPath(s.objectForKey(key))
+	obj := s.objectForKey(key)
+	if err := s.validateObjectPath(obj); err != nil {
+		return err
+	}
+	return s.removeObjectPath(obj)
 }
 
 func (s *LocalCacheStore) removeObjectPath(obj cachedObject) error {
@@ -369,7 +390,14 @@ func (s *LocalCacheStore) scanObjects() ([]cachedObject, error) {
 		if err := json.Unmarshal(data, &meta); err != nil {
 			return err
 		}
-		cachePath := strings.TrimSuffix(path, metaSuffix) + cacheSuffix
+		cachePath := strings.TrimSuffix(path, metaSuffix)
+		if meta.Key == "" {
+			rel, err := filepath.Rel(s.cacheDir, cachePath)
+			if err != nil {
+				return err
+			}
+			meta.Key = cleanKey(filepath.ToSlash(rel))
+		}
 		objects = append(objects, cachedObject{
 			metaPath:  path,
 			cachePath: cachePath,

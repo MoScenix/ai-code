@@ -19,6 +19,8 @@ func GlobalAuth() app.HandlerFunc {
 			c.Next(ctx)
 			return
 		}
+		c.Set(utils.UserIdKey, userId)
+		c.Set(utils.UserRoleKey, userRole)
 		ctx = context.WithValue(ctx, utils.UserIdKey, userId)
 		ctx = context.WithValue(ctx, utils.UserRoleKey, userRole)
 		c.Next(ctx)

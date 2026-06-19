@@ -519,6 +519,11 @@ func (x *AppMessage) FastRead(buf []byte, _type int8, number int32) (offset int,
 		if err != nil {
 			goto ReadFieldError
 		}
+	case 9:
+		offset, err = x.fastReadField9(buf, _type)
+		if err != nil {
+			goto ReadFieldError
+		}
 	default:
 		offset, err = fastpb.Skip(buf, _type, number)
 		if err != nil {
@@ -572,6 +577,11 @@ func (x *AppMessage) fastReadField8(buf []byte, _type int8) (offset int, err err
 	return offset, err
 }
 
+func (x *AppMessage) fastReadField9(buf []byte, _type int8) (offset int, err error) {
+	x.IsFile, offset, err = fastpb.ReadBool(buf, _type)
+	return offset, err
+}
+
 func (x *AddMessageReq) FastRead(buf []byte, _type int8, number int32) (offset int, err error) {
 	switch number {
 	case 1:
@@ -591,6 +601,11 @@ func (x *AddMessageReq) FastRead(buf []byte, _type int8, number int32) (offset i
 		}
 	case 4:
 		offset, err = x.fastReadField4(buf, _type)
+		if err != nil {
+			goto ReadFieldError
+		}
+	case 5:
+		offset, err = x.fastReadField5(buf, _type)
 		if err != nil {
 			goto ReadFieldError
 		}
@@ -624,6 +639,11 @@ func (x *AddMessageReq) fastReadField3(buf []byte, _type int8) (offset int, err 
 
 func (x *AddMessageReq) fastReadField4(buf []byte, _type int8) (offset int, err error) {
 	x.Content, offset, err = fastpb.ReadString(buf, _type)
+	return offset, err
+}
+
+func (x *AddMessageReq) fastReadField5(buf []byte, _type int8) (offset int, err error) {
+	x.IsFile, offset, err = fastpb.ReadBool(buf, _type)
 	return offset, err
 }
 
@@ -1149,6 +1169,7 @@ func (x *AppMessage) FastWrite(buf []byte) (offset int) {
 	offset += x.fastWriteField6(buf[offset:])
 	offset += x.fastWriteField7(buf[offset:])
 	offset += x.fastWriteField8(buf[offset:])
+	offset += x.fastWriteField9(buf[offset:])
 	return offset
 }
 
@@ -1216,6 +1237,14 @@ func (x *AppMessage) fastWriteField8(buf []byte) (offset int) {
 	return offset
 }
 
+func (x *AppMessage) fastWriteField9(buf []byte) (offset int) {
+	if !x.IsFile {
+		return offset
+	}
+	offset += fastpb.WriteBool(buf[offset:], 9, x.GetIsFile())
+	return offset
+}
+
 func (x *AddMessageReq) FastWrite(buf []byte) (offset int) {
 	if x == nil {
 		return offset
@@ -1224,6 +1253,7 @@ func (x *AddMessageReq) FastWrite(buf []byte) (offset int) {
 	offset += x.fastWriteField2(buf[offset:])
 	offset += x.fastWriteField3(buf[offset:])
 	offset += x.fastWriteField4(buf[offset:])
+	offset += x.fastWriteField5(buf[offset:])
 	return offset
 }
 
@@ -1256,6 +1286,14 @@ func (x *AddMessageReq) fastWriteField4(buf []byte) (offset int) {
 		return offset
 	}
 	offset += fastpb.WriteString(buf[offset:], 4, x.GetContent())
+	return offset
+}
+
+func (x *AddMessageReq) fastWriteField5(buf []byte) (offset int) {
+	if !x.IsFile {
+		return offset
+	}
+	offset += fastpb.WriteBool(buf[offset:], 5, x.GetIsFile())
 	return offset
 }
 
@@ -1729,6 +1767,7 @@ func (x *AppMessage) Size() (n int) {
 	n += x.sizeField6()
 	n += x.sizeField7()
 	n += x.sizeField8()
+	n += x.sizeField9()
 	return n
 }
 
@@ -1796,6 +1835,14 @@ func (x *AppMessage) sizeField8() (n int) {
 	return n
 }
 
+func (x *AppMessage) sizeField9() (n int) {
+	if !x.IsFile {
+		return n
+	}
+	n += fastpb.SizeBool(9, x.GetIsFile())
+	return n
+}
+
 func (x *AddMessageReq) Size() (n int) {
 	if x == nil {
 		return n
@@ -1804,6 +1851,7 @@ func (x *AddMessageReq) Size() (n int) {
 	n += x.sizeField2()
 	n += x.sizeField3()
 	n += x.sizeField4()
+	n += x.sizeField5()
 	return n
 }
 
@@ -1836,6 +1884,14 @@ func (x *AddMessageReq) sizeField4() (n int) {
 		return n
 	}
 	n += fastpb.SizeString(4, x.GetContent())
+	return n
+}
+
+func (x *AddMessageReq) sizeField5() (n int) {
+	if !x.IsFile {
+		return n
+	}
+	n += fastpb.SizeBool(5, x.GetIsFile())
 	return n
 }
 
@@ -2028,6 +2084,7 @@ var fieldIDToName_AppMessage = map[int32]string{
 	6: "CreateTime",
 	7: "UpdateTime",
 	8: "IsDelete",
+	9: "IsFile",
 }
 
 var fieldIDToName_AddMessageReq = map[int32]string{
@@ -2035,6 +2092,7 @@ var fieldIDToName_AddMessageReq = map[int32]string{
 	2: "UserId",
 	3: "Role",
 	4: "Content",
+	5: "IsFile",
 }
 
 var fieldIDToName_AddMessageResp = map[int32]string{

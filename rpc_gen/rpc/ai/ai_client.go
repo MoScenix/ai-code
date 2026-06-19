@@ -2,7 +2,6 @@ package ai
 
 import (
 	"context"
-
 	ai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
 
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai/aiservice"
@@ -13,7 +12,7 @@ import (
 type RPCClient interface {
 	KitexClient() aiservice.Client
 	Service() string
-	Chat(ctx context.Context, Req *ai.AiReq, callOptions ...callopt.Option) (stream aiservice.AiService_ChatClient, err error)
+	Chat(ctx context.Context, Req *ai.AiReq, callOptions ...callopt.Option) (r *ai.AiResp, err error)
 }
 
 func NewRPCClient(dstService string, opts ...client.Option) (RPCClient, error) {
@@ -42,6 +41,6 @@ func (c *clientImpl) KitexClient() aiservice.Client {
 	return c.kitexClient
 }
 
-func (c *clientImpl) Chat(ctx context.Context, Req *ai.AiReq, callOptions ...callopt.Option) (stream aiservice.AiService_ChatClient, err error) {
+func (c *clientImpl) Chat(ctx context.Context, Req *ai.AiReq, callOptions ...callopt.Option) (r *ai.AiResp, err error) {
 	return c.kitexClient.Chat(ctx, Req, callOptions...)
 }

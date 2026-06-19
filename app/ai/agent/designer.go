@@ -17,13 +17,18 @@ import (
 const designerInstructionPath = "prompt/designer/instruction.prompt"
 
 type AskUserInput struct {
-	Questions []string `json:"questions" jsonschema:"description=Questions that must be answered by the user before design can continue."`
-	Context   string   `json:"context,omitempty" jsonschema:"description=Short context explaining why these questions are needed."`
+	Questions []AskUserQuestion `json:"questions" jsonschema:"description=Questions that must be answered by the user before design can continue."`
+	Context   string            `json:"context,omitempty" jsonschema:"description=Short context explaining why these questions are needed."`
+}
+
+type AskUserQuestion struct {
+	Question string   `json:"question" jsonschema:"description=The question text shown to the user."`
+	Options  []string `json:"options,omitempty" jsonschema:"description=Suggested answer options. The user may choose one or provide custom text."`
 }
 
 type DesignerInterruptState struct {
-	Questions []string `json:"questions"`
-	Context   string   `json:"context,omitempty"`
+	Questions []AskUserQuestion `json:"questions"`
+	Context   string            `json:"context,omitempty"`
 }
 
 type DesignerAnswer struct {
@@ -32,6 +37,8 @@ type DesignerAnswer struct {
 }
 
 func init() {
+	schema.RegisterName[AskUserInput]("ai_ask_user_input_v1")
+	schema.RegisterName[AskUserQuestion]("ai_ask_user_question_v1")
 	schema.RegisterName[DesignerInterruptState]("ai_designer_interrupt_state_v1")
 	schema.RegisterName[DesignerAnswer]("ai_designer_answer_v1")
 }

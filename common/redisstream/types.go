@@ -14,6 +14,7 @@ type Store interface {
 	Add(ctx context.Context, key string, value any) (string, error)
 	Read(ctx context.Context, key string, afterID string, opts ReadOptions) ([]Message, error)
 	Del(ctx context.Context, key string) error
+	Expire(ctx context.Context, key string, ttl time.Duration) error
 }
 
 type ReadOptions struct {

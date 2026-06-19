@@ -1,0 +1,37 @@
+kitex:
+  service: "document"
+  address: ":8888"
+  log_level: info
+  log_file_name: "log/kitex.log"
+  log_max_size: 10
+  log_max_age: 3
+  log_max_backups: 50
+
+registry:
+  registry_address:
+    - consul:8500
+  username: ""
+  password: ""
+
+mysql:
+  dsn: "gorm:gorm@tcp(127.0.0.1:3306)/gorm?charset=utf8mb4&parseTime=True&loc=Local"
+
+redis:
+  address: "redis:6379"
+  username: ""
+  password: ""
+  db: 0
+
+es:
+  addresses:
+    - "http://elasticsearch:9200"
+  index: "document_chunks"
+  username: ""
+  password: ""
+
+milvus:
+  address: "milvus:19530"
+  collection: "document_chunks"
+  vector_dim: 768
+  username: ""
+  password: ""

@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -15,10 +14,12 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 const (
 	defaultBaseURL        = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+	defaultModelName      = "qwen-max-latest"
 	defaultTimeoutSeconds = 120
 	defaultMaxRetries     = 2
 )
@@ -39,7 +40,7 @@ func NewChatModel(ctx context.Context) (model.ToolCallingChatModel, error) {
 
 	modelName := strings.TrimSpace(os.Getenv("MODEL_NAME"))
 	if modelName == "" {
-		return nil, fmt.Errorf("MODEL_NAME is empty")
+		modelName = defaultModelName
 	}
 
 	timeout := getEnvInt("DASHSCOPE_TIMEOUT_SECONDS", defaultTimeoutSeconds)
@@ -97,7 +98,7 @@ func getEnvInt(key string, fallback int) int {
 
 	value, err := strconv.Atoi(raw)
 	if err != nil || value < 0 {
-		log.Printf("invalid %s=%q, fallback to %d", key, raw, fallback)
+		klog.Warnf("invalid env int: key=%s fallback=%d", key, fallback)
 		return fallback
 	}
 	return value
@@ -121,7 +122,7 @@ func (r *retryChatModel) Generate(ctx context.Context, input []*schema.Message, 
 			return nil, err
 		}
 
-		log.Printf("retrying DashScope generate request (%d/%d): %v", attempt+1, r.maxRetries, err)
+		klog.CtxWarnf(ctx, "retry dashscope generate: attempt=%d max_retries=%d err=%v", attempt+1, r.maxRetries, err)
 		time.Sleep(backoff(attempt + 1))
 	}
 
@@ -141,7 +142,7 @@ func (r *retryChatModel) Stream(ctx context.Context, input []*schema.Message, op
 			return nil, err
 		}
 
-		log.Printf("retrying DashScope stream request (%d/%d): %v", attempt+1, r.maxRetries, err)
+		klog.CtxWarnf(ctx, "retry dashscope stream: attempt=%d max_retries=%d err=%v", attempt+1, r.maxRetries, err)
 		time.Sleep(backoff(attempt + 1))
 	}
 

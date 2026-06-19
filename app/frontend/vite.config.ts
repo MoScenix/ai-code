@@ -20,6 +20,11 @@ export default defineConfig({
         secure: false,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },
+      '/static': {
+        target: 'http://localhost:8082',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
 })

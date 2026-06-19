@@ -24,8 +24,9 @@ func NewCoder(ctx context.Context, store project.Store) (*adk.ChatModelAgent, er
 		return nil, err
 	}
 
+	filesystemBackend := aitools.NewProjectFilesystemBackend(store)
 	filesystemMiddleware, err := fsmd.New(ctx, &fsmd.MiddlewareConfig{
-		Backend: aitools.NewProjectFilesystemBackend(store),
+		Backend: filesystemBackend,
 	})
 	if err != nil {
 		return nil, err

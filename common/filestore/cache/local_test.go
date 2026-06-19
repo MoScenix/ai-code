@@ -3,6 +3,8 @@ package cache
 import (
 	"context"
 	"errors"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
@@ -53,6 +55,37 @@ func TestLocalCacheStoreFlushPrefix(t *testing.T) {
 	}
 	if string(data) != "b" {
 		t.Fatalf("expected project_b cached content, got %q", data)
+	}
+}
+
+func TestLocalCacheStoreMirrorsKeyPath(t *testing.T) {
+	ctx := context.Background()
+	actual, err := base.NewLocalStore(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	cacheDir := t.TempDir()
+	store := &LocalCacheStore{
+		actual:     actual,
+		cacheDir:   cacheDir,
+		ttl:        time.Hour,
+		needsFlush: true,
+	}
+
+	if err := store.Write(ctx, "project_a/src/main.go", []byte("cached")); err != nil {
+		t.Fatal(err)
+	}
+
+	cachePath := filepath.Join(cacheDir, "project_a", "src", "main.go")
+	data, err := os.ReadFile(cachePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) != "cached" {
+		t.Fatalf("expected mirrored cache content, got %q", data)
+	}
+	if _, err := os.Stat(cachePath + metaSuffix); err != nil {
+		t.Fatalf("expected mirrored cache metadata: %v", err)
 	}
 }
 

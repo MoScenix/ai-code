@@ -4,16 +4,69 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
+	"github.com/MoScenix/ai-code/common/rpcmeta"
 	rpcapp "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 	"github.com/cloudwego/eino/schema"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 const defaultHistoryLimit int64 = 20
 
 func LoadChatHistory(ctx context.Context, appID int64) ([]*schema.Message, error) {
 	return LoadChatHistoryWithLimit(ctx, appID, defaultHistoryLimit)
+}
+
+func AddAssistantMessage(ctx context.Context, appID int64, content string) error {
+	return addChatMessage(ctx, appID, "assistant", content)
+}
+
+func AddUserMessage(ctx context.Context, appID int64, content string) error {
+	return addChatMessage(ctx, appID, "user", content)
+}
+
+func addChatMessage(ctx context.Context, appID int64, role string, content string) error {
+	content = strings.TrimSpace(content)
+	userID, _ := rpcmeta.OperatorIDFromContext(ctx)
+	if appID <= 0 || content == "" {
+		return nil
+	}
+
+	client, err := AppClient()
+	if err != nil {
+		klog.CtxErrorf(ctx, "get app client failed while saving ai message: app_id=%d role=%s err=%v", appID, role, err)
+		return err
+	}
+
+	_, err = client.AddMessage(ctx, &rpcapp.AddMessageReq{
+		AppId:   appID,
+		UserId:  userID,
+		Role:    role,
+		Content: content,
+	})
+	if err != nil {
+		klog.CtxErrorf(ctx, "save ai message failed: app_id=%d user_id=%d role=%s err=%v", appID, userID, role, err)
+		return err
+	}
+	return err
+}
+
+func AddProjectAssistantMessage(ctx context.Context, projectID string, content string) error {
+	appID, err := strconv.ParseInt(projectID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse project id %q: %w", projectID, err)
+	}
+	return AddAssistantMessage(ctx, appID, content)
+}
+
+func AddProjectUserMessage(ctx context.Context, projectID string, content string) error {
+	appID, err := strconv.ParseInt(projectID, 10, 64)
+	if err != nil {
+		return fmt.Errorf("parse project id %q: %w", projectID, err)
+	}
+	return AddUserMessage(ctx, appID, content)
 }
 
 func LoadProjectChatHistory(ctx context.Context, projectID string) ([]*schema.Message, error) {

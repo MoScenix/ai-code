@@ -60,6 +60,10 @@ func Register(r *server.Hertz) {
 			_download.GET("/:appId", append(_downloadappcodeMw(), app.DownloadAppCode)...)
 		}
 		{
+			_file := _app.Group("/file", _fileMw()...)
+			_file.POST("/add", append(_addfileMw(), app.AddFile)...)
+		}
+		{
 			_get0 := _app.Group("/get", _get0Mw()...)
 			_get0.GET("/vo", append(_getappvobyidMw(), app.GetAppVOById)...)
 		}

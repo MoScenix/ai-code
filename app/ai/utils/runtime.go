@@ -2,6 +2,7 @@ package utils
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 )
 
@@ -10,8 +11,10 @@ const runtimeStateKey contextKey = "runtime_state"
 type RuntimeState struct {
 	Buffer *StringBuffer
 
-	cancel    context.CancelFunc
-	cancelled atomic.Bool
+	mu            sync.RWMutex
+	controlCursor string
+	cancel        context.CancelFunc
+	cancelled     atomic.Bool
 }
 
 func NewRuntimeState(cancel context.CancelFunc) *RuntimeState {
@@ -42,6 +45,24 @@ func (s *RuntimeState) IsCancelled() bool {
 	return s != nil && s.cancelled.Load()
 }
 
+func (s *RuntimeState) ControlCursor() string {
+	if s == nil {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.controlCursor
+}
+
+func (s *RuntimeState) SetControlCursor(cursor string) {
+	if s == nil || cursor == "" {
+		return
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.controlCursor = cursor
+}
+
 func WithRuntimeState(ctx context.Context, state *RuntimeState) context.Context {
 	return context.WithValue(ctx, runtimeStateKey, state)
 }
@@ -63,5 +84,19 @@ func CancelRuntime(ctx context.Context) {
 	}
 	if cancel, ok := CancelFuncFromContext(ctx); ok && cancel != nil {
 		cancel()
+	}
+}
+
+func ControlCursor(ctx context.Context) string {
+	state, ok := RuntimeStateFromContext(ctx)
+	if !ok {
+		return ""
+	}
+	return state.ControlCursor()
+}
+
+func SetControlCursor(ctx context.Context, cursor string) {
+	if state, ok := RuntimeStateFromContext(ctx); ok {
+		state.SetControlCursor(cursor)
 	}
 }

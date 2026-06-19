@@ -5,52 +5,87 @@ import (
 	"strings"
 	"time"
 
+	"github.com/MoScenix/ai-code/app/ai/node/control"
 	"github.com/MoScenix/ai-code/app/ai/utils"
 	"github.com/MoScenix/ai-code/common/aievent"
+	"github.com/MoScenix/ai-code/common/redisstate"
 	"github.com/MoScenix/ai-code/common/redisstream"
+	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/schema"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
-func watchPushes(ctx context.Context, store redisstream.Store, projectID string, lastEventID *string, buffer *utils.StringBuffer) {
-	if store == nil || projectID == "" {
-		return
-	}
-
-	lastID := lastEventCursor(ctx, projectID)
-	for {
-		if ctx.Err() != nil {
-			return
-		}
-		messages, err := store.Read(ctx, aievent.StreamKey(projectID), lastID, redisstream.ReadOptions{
-			Block: 30 * time.Second,
-			Count: 10,
-		})
-		if err != nil {
-			if ctx.Err() != nil {
+func watchPushes(ctx context.Context, stateStore *redisstate.Store, store redisstream.Store, projectID string, buffer *utils.StringBuffer, answers chan<- answerEvent, loop *adk.TurnLoop[[]*schema.Message, *schema.Message]) {
+	control.Watch(ctx, store, projectID, controlCursor(ctx, projectID), control.Handler{
+		OnPush: func(ctx context.Context, msg redisstream.Message, event aievent.TaskEvent) {
+			utils.SetControlCursor(ctx, msg.ID)
+			content := strings.TrimSpace(event.Content)
+			if content != "" && buffer != nil {
+				buffer.WriteString(content)
+				buffer.WriteString("\n")
+			}
+			if content != "" && loop != nil {
+				_, done := loop.Push([]*schema.Message{schema.UserMessage(content)})
+				if done != nil {
+					go func() { <-done }()
+				}
+			}
+		},
+		OnCancel: func(ctx context.Context, msg redisstream.Message, event aievent.TaskEvent) {
+			utils.SetControlCursor(ctx, msg.ID)
+			utils.CancelRuntime(ctx)
+			if loop != nil {
+				reason := strings.TrimSpace(event.Content)
+				if reason == "" {
+					reason = "cancelled"
+				}
+				loop.Stop(adk.WithImmediate(), adk.WithStopCause(reason), adk.WithSkipCheckpoint())
+			}
+		},
+		OnAnswer: func(ctx context.Context, msg redisstream.Message, event aievent.TaskEvent) {
+			if answers == nil {
 				return
 			}
-			continue
-		}
+			select {
+			case answers <- answerEvent{
+				TargetID: strings.TrimSpace(event.TargetID),
+				Answer:   agentAnswer(event),
+			}:
+				utils.SetControlCursor(ctx, msg.ID)
+			case <-ctx.Done():
+				return
+			}
+			if err := markAnswerAccepted(ctx, projectID, strings.TrimSpace(event.TargetID), msg.ID); err != nil {
+				klog.CtxErrorf(ctx, "accept designer answer failed: project_id=%s target_id=%s err=%v", projectID, strings.TrimSpace(event.TargetID), err)
+			}
+		},
+	})
+}
 
-		for _, msg := range messages {
-			lastID = msg.ID
-			if lastEventID != nil {
-				*lastEventID = msg.ID
-			}
-
-			event, err := redisstream.Decode[aievent.TaskEvent](msg)
-			if err != nil {
-				continue
-			}
-			switch event.Type {
-			case aievent.EventPush:
-				content := strings.TrimSpace(event.Content)
-				if content != "" && buffer != nil {
-					buffer.WriteString(content)
-					buffer.WriteString("\n")
-				}
-			case aievent.EventCancel:
-				utils.CancelRuntime(ctx)
-			}
-		}
+func markAnswerAccepted(ctx context.Context, projectID string, targetID string, eventID string) error {
+	stateStore, ok := utils.StateStoreFromContext(ctx)
+	if !ok || stateStore == nil || projectID == "" || eventID == "" {
+		return nil
 	}
+
+	var state aievent.ProjectState
+	ok, err := stateStore.Get(ctx, aievent.RunningStateKey(projectID), &state)
+	if err != nil || !ok || state.Status != aievent.ProjectStatusWaitingAnswer {
+		return err
+	}
+	if targetID != "" && !aievent.PendingInterruptsMatch(state.PendingInterrupts, targetID) {
+		return nil
+	}
+
+	state.Status = aievent.ProjectStatusRunning
+	state.PendingInterrupts = nil
+	state.UpdatedAt = time.Now().UnixMilli()
+	return stateStore.Set(ctx, aievent.RunningStateKey(projectID), state)
+}
+
+func controlCursor(ctx context.Context, projectID string) string {
+	if cursor := strings.TrimSpace(utils.ControlCursor(ctx)); cursor != "" {
+		return cursor
+	}
+	return "$"
 }

@@ -5,7 +5,6 @@ package aiservice
 import (
 	"context"
 	"errors"
-	"fmt"
 	ai "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai"
 	client "github.com/cloudwego/kitex/client"
 	kitex "github.com/cloudwego/kitex/pkg/serviceinfo"
@@ -21,7 +20,7 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		newChatArgs,
 		newChatResult,
 		false,
-		kitex.WithStreamingMode(kitex.StreamingServer),
+		kitex.WithStreamingMode(kitex.StreamingUnary),
 	),
 }
 
@@ -48,7 +47,7 @@ func serviceInfoForClient() *kitex.ServiceInfo {
 
 // NewServiceInfo creates a new ServiceInfo containing all methods
 func NewServiceInfo() *kitex.ServiceInfo {
-	return newServiceInfo(true, true, true)
+	return newServiceInfo(false, true, true)
 }
 
 // NewServiceInfo creates a new ServiceInfo containing non-streaming methods
@@ -90,43 +89,30 @@ func newServiceInfo(hasStreaming bool, keepStreamingMethods bool, keepNonStreami
 }
 
 func chatHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
-	streamingArgs, ok := arg.(*streaming.Args)
-	if !ok {
+	switch s := arg.(type) {
+	case *streaming.Args:
+		st := s.Stream
+		req := new(ai.AiReq)
+		if err := st.RecvMsg(req); err != nil {
+			return err
+		}
+		resp, err := handler.(ai.AiService).Chat(ctx, req)
+		if err != nil {
+			return err
+		}
+		return st.SendMsg(resp)
+	case *ChatArgs:
+		success, err := handler.(ai.AiService).Chat(ctx, s.Req)
+		if err != nil {
+			return err
+		}
+		realResult := result.(*ChatResult)
+		realResult.Success = success
+		return nil
+	default:
 		return errInvalidMessageType
 	}
-	st := streamingArgs.Stream
-	stream := &aiServiceChatServer{st}
-	req := new(ai.AiReq)
-	if err := st.RecvMsg(req); err != nil {
-		return err
-	}
-	return handler.(ai.AiService).Chat(req, stream)
 }
-
-type aiServiceChatClient struct {
-	streaming.Stream
-}
-
-func (x *aiServiceChatClient) DoFinish(err error) {
-	if finisher, ok := x.Stream.(streaming.WithDoFinish); ok {
-		finisher.DoFinish(err)
-	} else {
-		panic(fmt.Sprintf("streaming.WithDoFinish is not implemented by %T", x.Stream))
-	}
-}
-func (x *aiServiceChatClient) Recv() (*ai.AiResp, error) {
-	m := new(ai.AiResp)
-	return m, x.Stream.RecvMsg(m)
-}
-
-type aiServiceChatServer struct {
-	streaming.Stream
-}
-
-func (x *aiServiceChatServer) Send(m *ai.AiResp) error {
-	return x.Stream.SendMsg(m)
-}
-
 func newChatArgs() interface{} {
 	return &ChatArgs{}
 }
@@ -265,23 +251,12 @@ func newServiceClient(c client.Client) *kClient {
 	}
 }
 
-func (p *kClient) Chat(ctx context.Context, req *ai.AiReq) (AiService_ChatClient, error) {
-	streamClient, ok := p.c.(client.Streaming)
-	if !ok {
-		return nil, fmt.Errorf("client not support streaming")
+func (p *kClient) Chat(ctx context.Context, Req *ai.AiReq) (r *ai.AiResp, err error) {
+	var _args ChatArgs
+	_args.Req = Req
+	var _result ChatResult
+	if err = p.c.Call(ctx, "Chat", &_args, &_result); err != nil {
+		return
 	}
-	res := new(streaming.Result)
-	err := streamClient.Stream(ctx, "Chat", nil, res)
-	if err != nil {
-		return nil, err
-	}
-	stream := &aiServiceChatClient{res.Stream}
-
-	if err := stream.Stream.SendMsg(req); err != nil {
-		return nil, err
-	}
-	if err := stream.Stream.Close(); err != nil {
-		return nil, err
-	}
-	return stream, nil
+	return _result.GetSuccess(), nil
 }
