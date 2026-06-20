@@ -53,20 +53,16 @@ func (p *Pool) Submit(ctx context.Context, task Task) error {
 		p.mu.Unlock()
 		return ErrPoolClosed
 	}
-
+	p.mu.Unlock()
 	select {
 	case p.jobs <- task:
-		p.mu.Unlock()
 		p.scaleAfterSubmit()
 		return nil
 	case <-ctx.Done():
-		p.mu.Unlock()
 		return ctx.Err()
 	case <-p.stop:
-		p.mu.Unlock()
 		return ErrPoolClosed
 	case <-p.ctx.Done():
-		p.mu.Unlock()
 		return ErrPoolClosed
 	}
 }
