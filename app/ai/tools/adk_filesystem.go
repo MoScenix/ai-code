@@ -25,7 +25,7 @@ func NewProjectFilesystemBackend(store project.Store) *ProjectFilesystemBackend 
 func (b *ProjectFilesystemBackend) LsInfo(ctx context.Context, req *adkfs.LsInfoRequest) ([]adkfs.FileInfo, error) {
 	infos, err := b.store.List(ctx, req.Path)
 	if err != nil {
-		return nil, err
+		return nil, nil
 	}
 	result := make([]adkfs.FileInfo, 0, len(infos))
 	for _, info := range infos {
@@ -37,7 +37,9 @@ func (b *ProjectFilesystemBackend) LsInfo(ctx context.Context, req *adkfs.LsInfo
 func (b *ProjectFilesystemBackend) Read(ctx context.Context, req *adkfs.ReadRequest) (*adkfs.FileContent, error) {
 	data, err := b.store.ReadFile(ctx, req.FilePath)
 	if err != nil {
-		return nil, err
+		return &adkfs.FileContent{
+			Content: recoverableFilesystemMessage("read_file_failed", err.Error()),
+		}, nil
 	}
 	content := readLines(string(data), req.Offset, req.Limit)
 	return &adkfs.FileContent{
@@ -68,7 +70,7 @@ func (b *ProjectFilesystemBackend) Edit(ctx context.Context, req *adkfs.EditRequ
 
 func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepRequest) ([]adkfs.GrepMatch, error) {
 	if req.Pattern == "" {
-		return nil, fmt.Errorf("pattern cannot be empty")
+		return nil, nil
 	}
 	pattern := req.Pattern
 	if req.CaseInsensitive {
@@ -76,12 +78,12 @@ func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepR
 	}
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, fmt.Errorf("invalid grep pattern: %w", err)
+		return nil, nil
 	}
 
 	files, err := b.listFiles(ctx, req.Path)
 	if err != nil {
-		return nil, err
+		return nil, nil
 	}
 
 	var matches []adkfs.GrepMatch
@@ -92,7 +94,7 @@ func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepR
 		if req.Glob != "" {
 			matched, err := matchGlob(req.Glob, info.Key)
 			if err != nil {
-				return nil, err
+				return nil, nil
 			}
 			if !matched {
 				continue
@@ -101,7 +103,7 @@ func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepR
 
 		data, err := b.store.ReadFile(ctx, info.Key)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		matches = append(matches, grepContent(info.Key, string(data), re, req)...)
 	}
@@ -117,19 +119,19 @@ func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepR
 
 func (b *ProjectFilesystemBackend) GlobInfo(ctx context.Context, req *adkfs.GlobInfoRequest) ([]adkfs.FileInfo, error) {
 	if req.Pattern == "" {
-		return nil, fmt.Errorf("pattern cannot be empty")
+		return nil, nil
 	}
 
 	entries, err := b.listEntries(ctx, req.Path)
 	if err != nil {
-		return nil, err
+		return nil, nil
 	}
 
 	result := make([]adkfs.FileInfo, 0)
 	for _, info := range entries {
 		matched, err := matchGlob(req.Pattern, info.Key)
 		if err != nil {
-			return nil, err
+			return nil, nil
 		}
 		if matched {
 			result = append(result, fileInfoFromPath(info))
@@ -140,6 +142,10 @@ func (b *ProjectFilesystemBackend) GlobInfo(ctx context.Context, req *adkfs.Glob
 		return result[i].Path < result[j].Path
 	})
 	return result, nil
+}
+
+func recoverableFilesystemMessage(code string, message string) string {
+	return fmt.Sprintf(`{"ok":false,"error":"%s","message":"%s"}`, code, strings.ReplaceAll(message, `"`, `\"`))
 }
 
 func (b *ProjectFilesystemBackend) replaceAll(ctx context.Context, path string, oldString string, newString string) error {

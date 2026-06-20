@@ -27,9 +27,10 @@ func (h *ChatToGenCodeService) Run(req *lapp.ChatToGenCodeRequest) (resp *lapp.S
 	w := sse.NewWriter(h.RequestContext)
 	defer w.Close()
 	q := rpc.AppClient
+	userID, _ := utils.UserIDFromContext(h.Context)
 	_, err = q.AddMessage(h.Context, &rpcapp.AddMessageReq{
 		AppId:   req.AppId,
-		UserId:  int64(h.Context.Value(utils.UserIdKey).(float64)),
+		UserId:  userID,
 		Content: req.Message,
 		Role:    "user",
 	})
@@ -39,7 +40,7 @@ func (h *ChatToGenCodeService) Run(req *lapp.ChatToGenCodeRequest) (resp *lapp.S
 	var Queryc = ai.AiReq{
 		ProjectId: strconv.FormatInt(req.AppId, 10),
 	}
-	data, err := rpc.AiClient.Chat(utils.WithIdentityMeta(h.Context), &Queryc)
+	data, err := rpc.AiClient.Chat(h.Context, &Queryc)
 	if err != nil {
 		return SendErr(w, err)
 	}

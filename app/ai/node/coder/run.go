@@ -71,7 +71,7 @@ func Run(ctx context.Context, input map[string]any) (map[string]any, error) {
 		UpdatedAt:   time.Now().UnixMilli(),
 	})
 	loop.Push(initialMessages)
-	loop.Stop(adk.UntilIdleFor(3 * time.Second))
+	loop.Stop(adk.UntilIdleFor(time.Millisecond))
 
 	controlCtx, cancelControl := context.WithCancel(ctx)
 	controlDone := make(chan struct{})

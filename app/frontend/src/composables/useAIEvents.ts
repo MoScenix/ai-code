@@ -8,9 +8,24 @@ export interface AIMessage {
   loading?: boolean
   agent?: string
   isPush?: boolean
+  isFile?: boolean
+  fileMeta?: AIFileMeta
   createTime?: string
   toolCalls?: AIToolCall[]
   parts?: AIMessagePart[]
+}
+
+export interface AIFileMeta {
+  fileId?: number
+  filename?: string
+  contentType?: string
+  size?: number
+  textFilename?: string
+  textSize?: number
+  isBig?: boolean
+  chunkCount?: number
+  parentCount?: number
+  text?: string
 }
 
 export interface AIToolCall {
@@ -47,7 +62,6 @@ export function useAIEvents(appId: Ref<any>) {
   let lastEventId = '0'
   let polling = false
   let abortController: AbortController | null = null
-  let stateTimer: ReturnType<typeof window.setInterval> | null = null
 
   function stopEventPolling() {
     polling = false
@@ -57,23 +71,9 @@ export function useAIEvents(appId: Ref<any>) {
 
   function stop() {
     stopEventPolling()
-    stopStatePolling()
   }
 
   onUnmounted(stop)
-
-  function startStatePolling() {
-    if (stateTimer) return
-    stateTimer = window.setInterval(() => {
-      void refreshState()
-    }, 1000)
-  }
-
-  function stopStatePolling() {
-    if (!stateTimer) return
-    window.clearInterval(stateTimer)
-    stateTimer = null
-  }
 
   function appendSystem(content: string) {
     if (!content) return
@@ -100,6 +100,39 @@ export function useAIEvents(appId: Ref<any>) {
     }
     messages.value.push(msg)
     return msg
+  }
+
+  function isActiveStatus(status?: string) {
+    return status === 'queued' || status === 'running' || status === 'waiting_answer' || status === 'interrupted'
+  }
+
+  function setLocalState(status: API.AIStatusType, patch: Partial<API.AIState> = {}) {
+    aiState.value = {
+      exists: true,
+      status,
+      agent: patch.agent ?? aiState.value?.agent,
+      lastEventId: patch.lastEventId ?? lastEventId,
+      pendingInterrupts: patch.pendingInterrupts ?? aiState.value?.pendingInterrupts,
+      message: patch.message ?? aiState.value?.message,
+    }
+  }
+
+  function restoreRunningMessage(state: API.AIState) {
+    if (!isActiveStatus(state.status) || state.status === 'waiting_answer' || state.status === 'interrupted') return
+    const last = messages.value[messages.value.length - 1]
+    if (last?.type === 'ai') {
+      last.loading = true
+      if (state.agent) last.agent = state.agent
+      return
+    }
+    messages.value.push({
+      id: `ai-running-${Date.now()}`,
+      type: 'ai',
+      content: ((state as any).buffer as string) || '',
+      agent: state.agent,
+      loading: true,
+      toolCalls: [],
+    })
   }
 
   function finishAIMessage() {
@@ -155,9 +188,13 @@ export function useAIEvents(appId: Ref<any>) {
 
     switch (event.type) {
       case 'accepted':
+        setLocalState('queued', { lastEventId: event.id, message: event.content })
         appendSystem(event.content || '任务已接收')
         break
       case 'agent_start':
+        setLocalState('running', { agent: event.agent, lastEventId: event.id })
+        isGenerating.value = true
+        ensureAIMessage(event)
         appendSystem(`${event.agent || 'AI'} 开始处理`)
         break
       case 'message': {
@@ -225,20 +262,29 @@ export function useAIEvents(appId: Ref<any>) {
         if (!currentQuestion.value || currentQuestion.value.id === event.targetId) {
           currentQuestion.value = null
           isGenerating.value = true
+          setLocalState('running', { lastEventId: event.id })
           ensureAIMessage()
         }
         break
       case 'question':
+        setLocalState('waiting_answer', { agent: event.agent, lastEventId: event.id })
         currentQuestion.value = normalizeQuestion(event)
         isGenerating.value = false
         break
       case 'done':
+        setLocalState('done', { lastEventId: event.id, message: event.content })
+        finishAIMessage()
+        isGenerating.value = false
+        polling = false
+        break
       case 'cancelled':
+        setLocalState('cancelled', { lastEventId: event.id, message: event.content })
         finishAIMessage()
         isGenerating.value = false
         polling = false
         break
       case 'error': {
+        setLocalState('error', { lastEventId: event.id, message: event.content })
         if ((event.content || '').includes('failed to invoke tool')) {
           appendToolError(event)
         } else {
@@ -273,10 +319,14 @@ export function useAIEvents(appId: Ref<any>) {
         if (res.data.code === 0) {
           const events = res.data.data?.events || []
           for (const event of events) processEvent(event)
-          if (events.length > 0) await refreshState()
         }
       } catch (e: any) {
         if (e?.name === 'CanceledError' || e?.code === 'ERR_CANCELED') break
+        await refreshState()
+        if (!isActiveStatus(aiState.value?.status)) {
+          polling = false
+          break
+        }
         await new Promise((resolve) => setTimeout(resolve, 2000))
       }
     }
@@ -287,6 +337,10 @@ export function useAIEvents(appId: Ref<any>) {
     const res = await getAIState({ appId: Number(appId.value) })
     if (res.data.code !== 0 || !res.data.data) return
     aiState.value = res.data.data
+    if (!res.data.data.exists) {
+      currentQuestion.value = null
+      return
+    }
     syncQuestionFromState(res.data.data)
   }
 
@@ -306,12 +360,12 @@ export function useAIEvents(appId: Ref<any>) {
   async function loadInitialState() {
     if (!appId.value) return
     await refreshState()
-    startStatePolling()
-    if (!aiState.value) return
+    if (!aiState.value?.exists) return
     lastEventId = aiState.value.lastEventId || '0'
     const status = aiState.value.status
-    if (status === 'queued' || status === 'running' || status === 'waiting_answer' || status === 'interrupted') {
+    if (isActiveStatus(status)) {
       isGenerating.value = status !== 'waiting_answer'
+      restoreRunningMessage(aiState.value)
       void pollEvents(lastEventId)
     }
   }
@@ -323,10 +377,12 @@ export function useAIEvents(appId: Ref<any>) {
     currentQuestion.value = null
     isGenerating.value = true
     lastEventId = '0'
+    setLocalState('queued')
     const res = await submitAI({ appId: Number(appId.value), message: content.trim() })
     if (res.data.code !== 0) {
       finishAIMessage()
       isGenerating.value = false
+      setLocalState('error', { message: res.data.message || '提交失败' })
       return false
     }
     void pollEvents('0')
@@ -338,9 +394,11 @@ export function useAIEvents(appId: Ref<any>) {
     const res = await pushAI({ appId: Number(appId.value), content: content.trim() })
     if (res.data.code !== 0) return false
     const id = res.data.data || `push-${Date.now()}`
+    lastEventId = id
     finishAIMessage()
     messages.value.push({ id, type: 'user', content: content.trim(), isPush: true })
     messages.value.push({ id: `ai-${Date.now()}`, type: 'ai', content: '', loading: true, toolCalls: [] })
+    setLocalState('running', { lastEventId: id })
     return true
   }
 
@@ -353,7 +411,9 @@ export function useAIEvents(appId: Ref<any>) {
     })
     if (res.data.code !== 0) return false
     await refreshState()
+    if (!aiState.value?.exists) return true
     isGenerating.value = true
+    setLocalState('running')
     ensureAIMessage()
     void pollEvents(lastEventId)
     return true
@@ -365,6 +425,7 @@ export function useAIEvents(appId: Ref<any>) {
     finishAIMessage()
     appendSystem('已取消')
     isGenerating.value = false
+    setLocalState('cancelled', { message: '用户取消' })
     stopEventPolling()
   }
 

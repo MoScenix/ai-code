@@ -1,7 +1,7 @@
 kitex:
   service: "ai"
   address: ":8895"
-  log_level: info
+  log_level: warn
   log_file_name: "log/kitex.log"
   log_max_size: 10
   log_max_age: 3
@@ -22,6 +22,16 @@ redis:
   username: ""
   password: ""
   db: 0
+
+llm:
+  base_url: "https://dashscope.aliyuncs.com/compatible-mode/v1"
+  model_name: "qwen3.7-max"
+  timeout_seconds: 120
+  max_tokens: 8192
+  max_retries: 2
+  temperature: 0.7
+  top_p: 0.7
+
 ShareDir:
   share_dir: ../../static/project/
 

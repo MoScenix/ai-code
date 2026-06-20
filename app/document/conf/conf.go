@@ -25,6 +25,7 @@ type Config struct {
 	Registry Registry `yaml:"registry"`
 	ES       ES       `yaml:"es"`
 	Milvus   Milvus   `yaml:"milvus"`
+	Index    Index    `yaml:"index"`
 }
 
 type MySQL struct {
@@ -67,6 +68,18 @@ type Milvus struct {
 	VectorDim  int    `yaml:"vector_dim"`
 	Username   string `yaml:"username"`
 	Password   string `yaml:"password"`
+}
+
+type Index struct {
+	TaskChunkSize      int `yaml:"task_chunk_size"`
+	EmbeddingBatchSize int `yaml:"embedding_batch_size"`
+	WriteBatchSize     int `yaml:"write_batch_size"`
+	MinWorkers         int `yaml:"min_workers"`
+	MaxWorkers         int `yaml:"max_workers"`
+	QueueSize          int `yaml:"queue_size"`
+	ScaleUpThreshold   int `yaml:"scale_up_threshold"`
+	ScaleDownThreshold int `yaml:"scale_down_threshold"`
+	IdleTimeoutSeconds int `yaml:"idle_timeout_seconds"`
 }
 
 // GetConf gets configuration instance

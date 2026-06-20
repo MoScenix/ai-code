@@ -1,16 +1,20 @@
 package rpc
 
 import (
+	"context"
 	"sync"
 
+	"github.com/MoScenix/ai-code/app/bff/biz/utils"
 	"github.com/MoScenix/ai-code/app/bff/conf"
 	"github.com/MoScenix/ai-code/common/clientsuit"
+	"github.com/MoScenix/ai-code/common/rpcmeta"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/ai/aiservice"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app/appservice"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/document/documentservice"
 	"github.com/MoScenix/ai-code/rpc_gen/kitex_gen/user/userservice"
 	"github.com/cloudwego/hertz/pkg/common/hlog"
 	"github.com/cloudwego/kitex/client"
+	"github.com/cloudwego/kitex/pkg/endpoint"
 )
 
 var (
@@ -82,5 +86,18 @@ func newCommonClientOptions(enableGRPC bool) []client.Option {
 		EnableGRPC:         enableGRPC,
 	}.Options()
 
+	opts = append(opts, client.WithMiddleware(identityMiddleware))
 	return opts
+}
+
+func identityMiddleware(next endpoint.Endpoint) endpoint.Endpoint {
+	return func(ctx context.Context, req, resp interface{}) error {
+		if rpcmeta.FromContext(ctx).OperatorID == "" {
+			if userID, ok := utils.UserIDFromContext(ctx); ok {
+				role, _ := ctx.Value(utils.UserRoleKey).(string)
+				ctx = rpcmeta.WithOperator(ctx, userID, role)
+			}
+		}
+		return next(ctx, req, resp)
+	}
 }

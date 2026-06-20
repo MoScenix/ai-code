@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 
@@ -26,24 +26,60 @@ func findFileByExt(dir string, ext string) (string, error) {
 		return "", err
 	}
 	ext = strings.ToLower(ext)
-	names := make([]string, 0, len(entries))
+	var selected os.DirEntry
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
 		}
 		name := entry.Name()
 		if strings.EqualFold(filepath.Ext(name), ext) {
-			names = append(names, name)
+			if selected == nil {
+				selected = entry
+				continue
+			}
+			selectedInfo, selectedErr := selected.Info()
+			entryInfo, entryErr := entry.Info()
+			if selectedErr == nil && entryErr == nil && entryInfo.ModTime().After(selectedInfo.ModTime()) {
+				selected = entry
+			}
 		}
 	}
-	if len(names) == 0 {
+	if selected == nil {
 		return "", fmt.Errorf("document: no %s file in %s", ext, dir)
 	}
-	sort.Strings(names)
-	return filepath.Join(dir, names[0]), nil
+	return filepath.Join(dir, selected.Name()), nil
 }
 
 func parsePDFToTextFile(pdfPath string) (string, int64, error) {
+	if txtPath, size, err := parsePDFToTextFileWithPoppler(pdfPath); err == nil {
+		return txtPath, size, nil
+	}
+	return parsePDFToTextFileWithGoPDF(pdfPath)
+}
+
+func parsePDFToTextFileWithPoppler(pdfPath string) (string, int64, error) {
+	if _, err := exec.LookPath("pdftotext"); err != nil {
+		return "", 0, err
+	}
+
+	txtPath := strings.TrimSuffix(pdfPath, filepath.Ext(pdfPath)) + ".txt"
+	cmd := exec.Command("pdftotext", "-layout", "-enc", "UTF-8", pdfPath, txtPath)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return "", 0, fmt.Errorf("pdftotext failed: %w: %s", err, strings.TrimSpace(string(output)))
+	}
+
+	raw, err := os.ReadFile(txtPath)
+	if err != nil {
+		return "", 0, err
+	}
+	text := docutils.CleanText(string(raw))
+	if err := os.WriteFile(txtPath, []byte(text), 0o644); err != nil {
+		return "", 0, err
+	}
+	return txtPath, int64(len([]byte(text))), nil
+}
+
+func parsePDFToTextFileWithGoPDF(pdfPath string) (string, int64, error) {
 	file, reader, err := pdf.Open(pdfPath)
 	if err != nil {
 		return "", 0, err

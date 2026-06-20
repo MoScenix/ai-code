@@ -206,6 +206,7 @@ declare namespace API {
     createTime?: string
     updateTime?: string
     isDelete?: number
+    isFile?: boolean
   }
 
   type ChatHistoryQueryRequest = {

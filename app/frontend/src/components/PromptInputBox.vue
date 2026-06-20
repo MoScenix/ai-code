@@ -5,13 +5,9 @@
     @drop.prevent="handleDrop"
   >
     <div v-if="files.length > 0" class="flex flex-wrap gap-2 px-4 pt-3">
-      <div v-for="(file, index) in files" :key="index" class="relative group">
-        <img
-          :src="file.url"
-          :alt="file.name"
-          class="w-14 h-14 rounded-xl object-cover cursor-pointer"
-          @click="previewImage = file.url"
-        />
+      <div v-for="(file, index) in files" :key="index" class="file-chip group">
+        <PaperClipOutlined class="text-slate-500" />
+        <span class="file-name">{{ file.name }}</span>
         <button class="remove-file" @click="files.splice(index, 1)">×</button>
       </div>
     </div>
@@ -22,7 +18,7 @@
         :value="modelValue"
         rows="1"
         :placeholder="placeholder"
-        :disabled="disabled"
+        :disabled="disabled || isSubmitting"
         class="prompt-textarea"
         @input="onInput"
         @keydown="onKeydown"
@@ -31,10 +27,10 @@
 
     <div class="flex items-center justify-between px-3 pb-2">
       <div class="flex items-center gap-1">
-        <button class="icon-btn" title="上传图片" @click="fileInputRef?.click()">
+        <button class="icon-btn" title="上传文件" :disabled="isLoading || isSubmitting" @click="fileInputRef?.click()">
           <PaperClipOutlined />
         </button>
-        <input ref="fileInputRef" type="file" accept="image/*" class="hidden" @change="onFileChange" />
+        <input ref="fileInputRef" type="file" accept=".pdf,.txt,application/pdf,text/plain" class="hidden" :disabled="isLoading || isSubmitting" @change="onFileChange" />
 
         <div class="w-px h-5 bg-gray-200 mx-1"></div>
 
@@ -50,12 +46,13 @@
 
       <button
         class="send-btn"
-        :class="{ active: hasContent, stop: isLoading && !hasContent, idle: !isLoading && !hasContent }"
-        :disabled="disabled && !isLoading"
+        :class="{ active: hasContent || isSubmitting, stop: isLoading && !hasContent && !isSubmitting, idle: !isLoading && !hasContent && !isSubmitting }"
+        :disabled="isSubmitting || (disabled && !isLoading)"
         :title="buttonTitle"
         @click="handleButtonClick"
       >
-        <ArrowUpOutlined v-if="hasContent || !isLoading" />
+        <LoadingOutlined v-if="isSubmitting" class="spin-icon" />
+        <ArrowUpOutlined v-else-if="hasContent || !isLoading" />
         <svg v-else viewBox="0 0 24 24" class="w-3.5 h-3.5" fill="currentColor">
           <rect x="6" y="6" width="12" height="12" rx="1.5" />
         </svg>
@@ -63,22 +60,18 @@
     </div>
   </div>
 
-  <Teleport to="body">
-    <div v-if="previewImage" class="fixed inset-0 z-[9999] bg-black/60 flex items-center justify-center" @click="previewImage = null">
-      <img :src="previewImage" class="max-w-[90vw] max-h-[85vh] rounded-2xl shadow-2xl" />
-    </div>
-  </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, nextTick, ref, watch } from 'vue'
-import { ArrowUpOutlined, BulbOutlined, GlobalOutlined, PaperClipOutlined } from '@ant-design/icons-vue'
+import { ArrowUpOutlined, BulbOutlined, GlobalOutlined, LoadingOutlined, PaperClipOutlined } from '@ant-design/icons-vue'
 
 type Mode = '' | 'search' | 'think'
 
 const props = defineProps<{
   modelValue: string
   isLoading?: boolean
+  isSubmitting?: boolean
   disabled?: boolean
   placeholder?: string
 }>()
@@ -92,8 +85,7 @@ const emit = defineEmits<{
 const textareaRef = ref<HTMLTextAreaElement>()
 const fileInputRef = ref<HTMLInputElement>()
 const mode = ref<Mode>('')
-const previewImage = ref<string | null>(null)
-const files = ref<Array<{ name: string; url: string; file: File }>>([])
+const files = ref<Array<{ name: string; file: File }>>([])
 
 const hasContent = computed(() => props.modelValue.trim().length > 0 || files.value.length > 0)
 const buttonTitle = computed(() => {
@@ -132,6 +124,12 @@ function handleButtonClick() {
     if (props.isLoading) emit('cancel')
     return
   }
+  if (props.isSubmitting) {
+    return
+  }
+  if (props.isLoading && files.value.length > 0) {
+    return
+  }
   let content = props.modelValue.trim()
   if (mode.value === 'search') content = `[搜索: ${content}]`
   if (mode.value === 'think') content = `[思考: ${content}]`
@@ -147,17 +145,18 @@ function onFileChange() {
 }
 
 function handleDrop(e: DragEvent) {
-  const file = Array.from(e.dataTransfer?.files || []).find((item) => item.type.startsWith('image/'))
+  const file = Array.from(e.dataTransfer?.files || []).find(isSupportedFile)
   if (file) processFile(file)
 }
 
 function processFile(file: File) {
-  if (!file.type.startsWith('image/')) return
-  const reader = new FileReader()
-  reader.onload = (e) => {
-    files.value = [{ name: file.name, url: e.target?.result as string, file }]
-  }
-  reader.readAsDataURL(file)
+  if (!isSupportedFile(file)) return
+  files.value = [{ name: file.name, file }]
+}
+
+function isSupportedFile(file: File) {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.pdf') || name.endsWith('.txt') || file.type === 'application/pdf' || file.type === 'text/plain'
 }
 </script>
 
@@ -258,9 +257,40 @@ function processFile(file: File) {
   color: #fff;
 }
 
+.spin-icon {
+  animation: spin 0.9s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .send-btn.active:hover,
 .send-btn.stop:hover {
   background: #374151;
+}
+
+.file-chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  min-height: 36px;
+  padding: 7px 28px 7px 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  background: #f8fafc;
+  color: #111827;
+  font-size: 12px;
+}
+
+.file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .remove-file {

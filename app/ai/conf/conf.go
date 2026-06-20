@@ -23,6 +23,7 @@ type Config struct {
 	MySQL    MySQL    `yaml:"mysql"`
 	Redis    Redis    `yaml:"redis"`
 	Registry Registry `yaml:"registry"`
+	LLM      LLM      `yaml:"llm"`
 	ShareDir ShareDir `yaml:"ShareDir"`
 	WorkPool WorkPool `yaml:"workpool"`
 }
@@ -54,6 +55,17 @@ type Registry struct {
 	Username        string   `yaml:"username"`
 	Password        string   `yaml:"password"`
 }
+
+type LLM struct {
+	BaseURL        string  `yaml:"base_url"`
+	ModelName      string  `yaml:"model_name"`
+	TimeoutSeconds int     `yaml:"timeout_seconds"`
+	MaxTokens      int     `yaml:"max_tokens"`
+	MaxRetries     int     `yaml:"max_retries"`
+	Temperature    float32 `yaml:"temperature"`
+	TopP           float32 `yaml:"top_p"`
+}
+
 type ShareDir struct {
 	ShareDir string `yaml:"share_dir"`
 }
@@ -93,7 +105,32 @@ func initConf() {
 		panic(err)
 	}
 	conf.Env = GetEnv()
+	normalizeLLMConfig(&conf.LLM)
 	pretty.Printf("%+v\n", conf)
+}
+
+func normalizeLLMConfig(llm *LLM) {
+	if llm.BaseURL == "" {
+		llm.BaseURL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+	}
+	if llm.ModelName == "" {
+		llm.ModelName = "qwen3.7-max"
+	}
+	if llm.TimeoutSeconds <= 0 {
+		llm.TimeoutSeconds = 120
+	}
+	if llm.MaxTokens <= 0 {
+		llm.MaxTokens = 8192
+	}
+	if llm.MaxRetries < 0 {
+		llm.MaxRetries = 0
+	}
+	if llm.Temperature <= 0 {
+		llm.Temperature = 0.7
+	}
+	if llm.TopP <= 0 {
+		llm.TopP = 0.7
+	}
 }
 
 func findConfFile() (string, error) {

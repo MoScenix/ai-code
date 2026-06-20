@@ -30,6 +30,14 @@ func (h *DeleteAppService) Run(req *lapp.DeleteRequest) (resp *lapp.BaseResponse
 			Message: err.Error(),
 		}, err
 	}
+	if res.Success {
+		if err := deleteProjectFileData(ctx, req.Id); err != nil {
+			return &lapp.BaseResponseBoolean{
+				Code:    1,
+				Message: err.Error(),
+			}, err
+		}
+	}
 	return &lapp.BaseResponseBoolean{
 		Code:    0,
 		Message: "success",

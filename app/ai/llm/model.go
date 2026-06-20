@@ -7,21 +7,14 @@ import (
 	"net"
 	"net/http"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
+	"github.com/MoScenix/ai-code/app/ai/conf"
 	"github.com/cloudwego/eino-ext/components/model/qwen"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/cloudwego/kitex/pkg/klog"
-)
-
-const (
-	defaultBaseURL        = "https://dashscope.aliyuncs.com/compatible-mode/v1"
-	defaultModelName      = "qwen-max-latest"
-	defaultTimeoutSeconds = 120
-	defaultMaxRetries     = 2
 )
 
 func intPtr(v int) *int {
@@ -38,17 +31,10 @@ func NewChatModel(ctx context.Context) (model.ToolCallingChatModel, error) {
 		return nil, fmt.Errorf("DASHSCOPE_API_KEY is empty")
 	}
 
-	modelName := strings.TrimSpace(os.Getenv("MODEL_NAME"))
-	if modelName == "" {
-		modelName = defaultModelName
-	}
-
-	timeout := getEnvInt("DASHSCOPE_TIMEOUT_SECONDS", defaultTimeoutSeconds)
-	maxRetries := getEnvInt("DASHSCOPE_MAX_RETRIES", defaultMaxRetries)
-	baseURL := getEnv("DASHSCOPE_BASE_URL", defaultBaseURL)
+	llmConf := conf.GetConf().LLM
 
 	httpClient := &http.Client{
-		Timeout: time.Duration(timeout) * time.Second,
+		Timeout: time.Duration(llmConf.TimeoutSeconds) * time.Second,
 		Transport: &http.Transport{
 			Proxy: http.ProxyFromEnvironment,
 			DialContext: (&net.Dialer{
@@ -65,13 +51,13 @@ func NewChatModel(ctx context.Context) (model.ToolCallingChatModel, error) {
 	}
 
 	cm, err := qwen.NewChatModel(ctx, &qwen.ChatModelConfig{
-		BaseURL:     baseURL,
+		BaseURL:     llmConf.BaseURL,
 		APIKey:      apiKey,
 		HTTPClient:  httpClient,
-		Model:       modelName,
-		MaxTokens:   intPtr(2048),
-		Temperature: float32Ptr(0.7),
-		TopP:        float32Ptr(0.7),
+		Model:       llmConf.ModelName,
+		MaxTokens:   intPtr(llmConf.MaxTokens),
+		Temperature: float32Ptr(llmConf.Temperature),
+		TopP:        float32Ptr(llmConf.TopP),
 	})
 	if err != nil {
 		return nil, err
@@ -79,29 +65,8 @@ func NewChatModel(ctx context.Context) (model.ToolCallingChatModel, error) {
 
 	return &retryChatModel{
 		inner:      cm,
-		maxRetries: maxRetries,
+		maxRetries: llmConf.MaxRetries,
 	}, nil
-}
-
-func getEnv(key, fallback string) string {
-	if value := strings.TrimSpace(os.Getenv(key)); value != "" {
-		return value
-	}
-	return fallback
-}
-
-func getEnvInt(key string, fallback int) int {
-	raw := strings.TrimSpace(os.Getenv(key))
-	if raw == "" {
-		return fallback
-	}
-
-	value, err := strconv.Atoi(raw)
-	if err != nil || value < 0 {
-		klog.Warnf("invalid env int: key=%s fallback=%d", key, fallback)
-		return fallback
-	}
-	return value
 }
 
 type retryChatModel struct {

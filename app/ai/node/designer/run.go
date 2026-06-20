@@ -274,7 +274,7 @@ func (s *designerSession) runTurn(initialMessages []*schema.Message, resumeParam
 	if initialMessages != nil {
 		loop.Push(initialMessages)
 	}
-	loop.Stop(adk.UntilIdleFor(3 * time.Second))
+	loop.Stop(adk.UntilIdleFor(time.Millisecond))
 
 	loop.Run(s.loopCtx)
 	state := loop.Wait()

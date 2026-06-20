@@ -10,6 +10,8 @@ import (
 	"github.com/MoScenix/ai-code/common/filestore/project"
 	"github.com/cloudwego/eino/adk"
 	fsmd "github.com/cloudwego/eino/adk/middlewares/filesystem"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/compose"
 )
 
 const coderInstructionPath = "prompt/coder/instruction.prompt"
@@ -25,9 +27,23 @@ func NewCoder(ctx context.Context, store project.Store) (*adk.ChatModelAgent, er
 	}
 
 	filesystemBackend := aitools.NewProjectFilesystemBackend(store)
+	editFileTool, err := aitools.NewEditFileTool()
+	if err != nil {
+		return nil, err
+	}
 	filesystemMiddleware, err := fsmd.New(ctx, &fsmd.MiddlewareConfig{
 		Backend: filesystemBackend,
+		WriteFileToolConfig: &fsmd.ToolConfig{
+			Desc: stringPtr("Write a project-relative file. Keep each write_file call small and valid JSON. Do not put large full-page HTML/CSS/JS payloads in one write_file call; split frontend work into separate files such as index.html, styles.css, and scripts.js, or create a short skeleton first and use edit_file for focused changes."),
+		},
+		EditFileToolConfig: &fsmd.ToolConfig{
+			CustomTool: editFileTool,
+		},
 	})
+	if err != nil {
+		return nil, err
+	}
+	searchTool, err := aitools.NewSearchProjectFileTool()
 	if err != nil {
 		return nil, err
 	}
@@ -43,5 +59,14 @@ func NewCoder(ctx context.Context, store project.Store) (*adk.ChatModelAgent, er
 		Instruction: string(instruction),
 		Model:       cm,
 		Handlers:    []adk.ChatModelAgentMiddleware{filesystemMiddleware},
+		ToolsConfig: adk.ToolsConfig{
+			ToolsNodeConfig: compose.ToolsNodeConfig{
+				Tools: []tool.BaseTool{searchTool},
+			},
+		},
 	})
+}
+
+func stringPtr(v string) *string {
+	return &v
 }

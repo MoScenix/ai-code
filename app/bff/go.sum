@@ -230,8 +230,6 @@ github.com/hertz-contrib/cors v0.1.0 h1:PQ5mATygSMzTlYtfyMyHjobYoJeHKe2Qt3tcAOgb
 github.com/hertz-contrib/cors v0.1.0/go.mod h1:VPReoq+Rvu/lZOfpp5CcX3x4mpZUc3EpSXBcVDcbvOc=
 github.com/hertz-contrib/gzip v0.0.4 h1:a9UUuE+YY08U2gSWSRhzaEG4fJxsKYPzbyO+d5t9kBM=
 github.com/hertz-contrib/gzip v0.0.4/go.mod h1:gPnt6z6FbTrFPgR69XwV4yU49m/V3516aWwIvAnTbWM=
-github.com/hertz-contrib/logger/accesslog v0.0.0-20241107070745-e4ce8c54dd97 h1:7sVi9PFkcVRtL9kbW+8htABmtyCNr/hPxEZ5PMgGIUo=
-github.com/hertz-contrib/logger/accesslog v0.0.0-20241107070745-e4ce8c54dd97/go.mod h1:vB3TNAD0IvvDhfY1SWSeCaAVbWleDKEuQ4zOK70hb64=
 github.com/hertz-contrib/logger/logrus v1.0.1 h1:1iFu/L92QlFSDXUn77WJL32dk/5HBzAUziG1OqcNMeE=
 github.com/hertz-contrib/logger/logrus v1.0.1/go.mod h1:SqDYLwVq5hTItYqimgZQbFCYPOIGNvBTq0Ip2OQwMcY=
 github.com/hertz-contrib/obs-opentelemetry/tracing v0.4.1 h1:YOv/UcSHjeAg1CwvcXi1zsNz5xFKf1iAKlEKAt7k31I=

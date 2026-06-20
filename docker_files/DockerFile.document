@@ -17,6 +17,30 @@ RUN cd app/document && go mod download && go mod verify
 COPY app/document ./app/document
 
 RUN cd app/document && go build -mod=readonly -v -o server
+RUN set -eux; \
+  if [ -f /etc/apt/sources.list.d/debian.sources ]; then \
+    sed -i \
+      -e 's#http://deb.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#https://deb.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#http://deb.debian.org/debian#https://mirrors.aliyun.com/debian#g' \
+      -e 's#https://deb.debian.org/debian#https://mirrors.aliyun.com/debian#g' \
+      /etc/apt/sources.list.d/debian.sources; \
+  fi; \
+  if [ -f /etc/apt/sources.list ]; then \
+    sed -i \
+      -e 's#http://deb.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#https://deb.debian.org/debian-security#https://mirrors.aliyun.com/debian-security#g' \
+      -e 's#http://deb.debian.org/debian#https://mirrors.aliyun.com/debian#g' \
+      -e 's#https://deb.debian.org/debian#https://mirrors.aliyun.com/debian#g' \
+      /etc/apt/sources.list; \
+  fi; \
+  echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries; \
+  apt-get update; \
+  apt-get install -y --no-install-recommends \
+    ca-certificates \
+    fonts-noto-cjk \
+    poppler-utils; \
+  rm -rf /var/lib/apt/lists/*
 
 WORKDIR /usr/src/gomall/app/document
 EXPOSE 8888

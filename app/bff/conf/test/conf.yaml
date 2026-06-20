@@ -1,10 +1,10 @@
 hertz:
   service: "bff"
   address: ":8082"
+  max_request_body_size: 209715200
   enable_pprof: true
   enable_gzip: true
-  enable_access_log: true
-  log_level: info
+  log_level: warn
   log_file_name: "log/hertz.log"
   log_max_size: 10
   log_max_age: 3

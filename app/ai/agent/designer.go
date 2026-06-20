@@ -7,6 +7,7 @@ import (
 	"os"
 
 	"github.com/MoScenix/ai-code/app/ai/llm"
+	aitools "github.com/MoScenix/ai-code/app/ai/tools"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
 	toolutils "github.com/cloudwego/eino/components/tool/utils"
@@ -57,6 +58,10 @@ func NewDesigner(ctx context.Context) (*adk.ChatModelAgent, error) {
 	if err != nil {
 		return nil, err
 	}
+	searchTool, err := aitools.NewSearchProjectFileTool()
+	if err != nil {
+		return nil, err
+	}
 
 	instruction, err := os.ReadFile(designerInstructionPath)
 	if err != nil {
@@ -70,7 +75,7 @@ func NewDesigner(ctx context.Context) (*adk.ChatModelAgent, error) {
 		Model:       cm,
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
-				Tools: []tool.BaseTool{askTool},
+				Tools: []tool.BaseTool{askTool, searchTool},
 			},
 		},
 	})

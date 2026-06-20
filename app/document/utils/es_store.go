@@ -27,7 +27,10 @@ type indexedChildDocument struct {
 	Content   string  `json:"content"`
 }
 
-func insertESChildChunk(ctx context.Context, meta ChildChunkMeta, content string) error {
+func insertESChildChunks(ctx context.Context, children []ChildChunk) error {
+	if len(children) == 0 {
+		return nil
+	}
 	cli, err := getESClient()
 	if err != nil {
 		return err
@@ -36,22 +39,32 @@ func insertESChildChunk(ctx context.Context, meta ChildChunkMeta, content string
 		return err
 	}
 
-	payload, err := json.Marshal(indexedChildDocument{
-		ProjectID: meta.ProjectID,
-		FileID:    meta.FileID,
-		ChunkID:   meta.ChunkID,
-		ParentIDs: meta.ParentIDs,
-		Content:   content,
-	})
-	if err != nil {
-		return err
+	var payload bytes.Buffer
+	encoder := json.NewEncoder(&payload)
+	for _, child := range children {
+		action := map[string]any{
+			"index": map[string]any{
+				"_id": chunkDocumentID(child.Meta),
+			},
+		}
+		if err := encoder.Encode(action); err != nil {
+			return err
+		}
+		if err := encoder.Encode(indexedChildDocument{
+			ProjectID: child.Meta.ProjectID,
+			FileID:    child.Meta.FileID,
+			ChunkID:   child.Meta.ChunkID,
+			ParentIDs: child.Meta.ParentIDs,
+			Content:   child.Content,
+		}); err != nil {
+			return err
+		}
 	}
 
-	res, err := cli.Index(
-		esIndexName(),
-		bytes.NewReader(payload),
-		cli.Index.WithContext(ctx),
-		cli.Index.WithDocumentID(chunkDocumentID(meta)),
+	res, err := cli.Bulk(
+		bytes.NewReader(payload.Bytes()),
+		cli.Bulk.WithContext(ctx),
+		cli.Bulk.WithIndex(esIndexName()),
 	)
 	if err != nil {
 		return err
@@ -59,7 +72,28 @@ func insertESChildChunk(ctx context.Context, meta ChildChunkMeta, content string
 	defer res.Body.Close()
 	if res.IsError() {
 		body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
-		return fmt.Errorf("index es child chunk failed: status=%s body=%s", res.Status(), strings.TrimSpace(string(body)))
+		return fmt.Errorf("bulk index es child chunks failed: status=%s body=%s", res.Status(), strings.TrimSpace(string(body)))
+	}
+
+	var parsed struct {
+		Errors bool `json:"errors"`
+		Items  []map[string]struct {
+			Status int             `json:"status"`
+			Error  json.RawMessage `json:"error"`
+		} `json:"items"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return err
+	}
+	if parsed.Errors {
+		for _, item := range parsed.Items {
+			for op, result := range item {
+				if result.Status >= 300 {
+					return fmt.Errorf("bulk index es child chunks failed: op=%s status=%d error=%s", op, result.Status, strings.TrimSpace(string(result.Error)))
+				}
+			}
+		}
+		return fmt.Errorf("bulk index es child chunks failed")
 	}
 	return nil
 }
@@ -98,6 +132,91 @@ func deleteESProjectData(ctx context.Context, projectID int64) error {
 	if res.IsError() {
 		body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
 		return fmt.Errorf("delete es project data failed: status=%s body=%s", res.Status(), strings.TrimSpace(string(body)))
+	}
+	return nil
+}
+
+func searchESChildren(ctx context.Context, projectID int64, fileID int64, query string, topK int64) ([]RetrievedChild, error) {
+	cli, err := getESClient()
+	if err != nil {
+		return nil, err
+	}
+	if err := ensureESIndex(ctx, cli); err != nil {
+		return nil, err
+	}
+	if topK <= 0 {
+		topK = 5
+	}
+
+	body := map[string]any{
+		"size": topK,
+		"query": map[string]any{
+			"bool": map[string]any{
+				"filter": []map[string]any{
+					{"term": map[string]any{"projectId": projectID}},
+					{"term": map[string]any{"fileId": fileID}},
+				},
+				"must": []map[string]any{
+					{"match": map[string]any{"content": query}},
+				},
+			},
+		},
+	}
+	payload, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+
+	res, err := cli.Search(
+		cli.Search.WithContext(ctx),
+		cli.Search.WithIndex(esIndexName()),
+		cli.Search.WithBody(bytes.NewReader(payload)),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+		return nil, fmt.Errorf("search es child chunks failed: status=%s body=%s", res.Status(), strings.TrimSpace(string(body)))
+	}
+
+	var parsed struct {
+		Hits struct {
+			Hits []struct {
+				Source indexedChildDocument `json:"_source"`
+			} `json:"hits"`
+		} `json:"hits"`
+	}
+	if err := json.NewDecoder(res.Body).Decode(&parsed); err != nil {
+		return nil, err
+	}
+
+	children := make([]RetrievedChild, 0, len(parsed.Hits.Hits))
+	for _, hit := range parsed.Hits.Hits {
+		if len(hit.Source.ParentIDs) == 0 {
+			continue
+		}
+		children = append(children, RetrievedChild{
+			ParentIDs: hit.Source.ParentIDs,
+		})
+	}
+	return children, nil
+}
+
+func refreshESIndex(ctx context.Context) error {
+	cli, err := getESClient()
+	if err != nil {
+		return err
+	}
+	res, err := cli.Indices.Refresh(cli.Indices.Refresh.WithContext(ctx), cli.Indices.Refresh.WithIndex(esIndexName()))
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+	if res.IsError() {
+		body, _ := io.ReadAll(io.LimitReader(res.Body, 4096))
+		return fmt.Errorf("refresh es index failed: status=%s body=%s", res.Status(), strings.TrimSpace(string(body)))
 	}
 	return nil
 }

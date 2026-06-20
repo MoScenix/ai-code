@@ -2,36 +2,63 @@ package tools
 
 import (
 	"context"
+	"strings"
 
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/components/tool/utils"
 )
 
 type EditFileParams struct {
-	Path string `json:"path" jsonschema:"description=文件路径相对于项目根目录的相对路径，不能包含 .. 或使用绝对路径"`
-	Old  string `json:"old" jsonschema:"description=需要替换的原始文本，必须在文件中唯一出现；如果不唯一，请提供更长上下文"`
-	New  string `json:"new" jsonschema:"description=替换后的新文本"`
+	FilePath   string `json:"file_path" jsonschema:"description=The path to the file to modify"`
+	OldString  string `json:"old_string" jsonschema:"description=The text to replace"`
+	NewString  string `json:"new_string" jsonschema:"description=The text to replace it with"`
+	ReplaceAll bool   `json:"replace_all" jsonschema:"description=Replace all occurrences of old_string (default false),default=false"`
 }
 
-type EditFileResult struct {
-	Ok    bool   `json:"ok" jsonschema:"description=是否成功编辑"`
-	Error string `json:"error" jsonschema:"description=错误信息"`
-}
-
-func EditFileFunc(ctx context.Context, params *EditFileParams) (EditFileResult, error) {
+func EditFileFunc(ctx context.Context, params *EditFileParams) (string, error) {
 	store, err := projectStoreFromContext(ctx)
 	if err != nil {
-		return EditFileResult{Ok: false, Error: err.Error()}, nil
+		return "", err
 	}
-	if err := store.EditFile(ctx, params.Path, params.Old, params.New); err != nil {
-		return EditFileResult{Ok: false, Error: err.Error()}, nil
+	if params.OldString == "" {
+		return `{"ok":false,"error":"empty_old_text","message":"old_string 不能为空。请先读取文件内容，确认要替换的完整文本。"}`, nil
 	}
-	return EditFileResult{Ok: true}, nil
+
+	data, err := store.ReadFile(ctx, params.FilePath)
+	if err != nil {
+		return "", err
+	}
+
+	content := string(data)
+	count := strings.Count(content, params.OldString)
+	if count == 0 {
+		return `{"ok":false,"error":"text_not_found","message":"目标文本未找到。请先读取文件内容，确认 old_string 完全一致后再调用 edit_file。"}`, nil
+	}
+	if count > 1 && !params.ReplaceAll {
+		return `{"ok":false,"error":"text_not_unique","message":"目标文本出现多次。请提供更长上下文让 old_string 唯一，或设置 replace_all=true。"}`, nil
+	}
+
+	next := strings.Replace(content, params.OldString, params.NewString, 1)
+	if params.ReplaceAll {
+		next = strings.ReplaceAll(content, params.OldString, params.NewString)
+	}
+	if err := store.WriteFile(ctx, params.FilePath, []byte(next)); err != nil {
+		return "", err
+	}
+
+	replaced := 1
+	if params.ReplaceAll {
+		replaced = count
+	}
+	if replaced > 1 {
+		return `{"ok":true,"message":"Successfully replaced all matching strings."}`, nil
+	}
+	return `{"ok":true,"message":"Successfully replaced the string."}`, nil
 }
 
 func NewEditFileTool() (tool.InvokableTool, error) {
 	return utils.InferTool(
-		"EditFile",
-		"精确替换文件中的一段文本。old 必须唯一匹配；用于修改已有文件，避免全量覆盖大文件。",
+		"edit_file",
+		"精确替换文件中的一段文本。old_string 必须完全匹配文件内容；如果失败会返回 JSON 错误结果，请先 read_file 确认内容后再重试。",
 		EditFileFunc)
 }

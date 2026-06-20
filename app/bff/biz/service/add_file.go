@@ -66,7 +66,6 @@ func (h *AddFileService) Run(req *lapp.AddFileRequest) (resp *lapp.BaseResponseS
 		meta.Size = stat.Size()
 	}
 
-	textPath := savePath
 	textSize := meta.Size
 	if ext == ".pdf" {
 		parsed, err := rpc.DocumentClient.ParsePDFToText(h.Context, &document.ParsePDFToTextReq{
@@ -78,7 +77,6 @@ func (h *AddFileService) Run(req *lapp.AddFileRequest) (resp *lapp.BaseResponseS
 		}
 		meta.TextFilename = parsed.TextFilename
 		textSize = parsed.TextSize
-		textPath = filepath.Join(dir, parsed.TextFilename)
 	} else {
 		meta.TextFilename = filename
 	}
@@ -98,12 +96,6 @@ func (h *AddFileService) Run(req *lapp.AddFileRequest) (resp *lapp.BaseResponseS
 		}
 		meta.ChunkCount = chunkResp.ChunkCount
 		meta.ParentCount = chunkResp.ParentCount
-	} else {
-		text, err := os.ReadFile(textPath)
-		if err != nil {
-			return nil, err
-		}
-		meta.Text = string(text)
 	}
 
 	content, err := json.Marshal(meta)
@@ -137,7 +129,6 @@ type fileMessageContent struct {
 	IsBig        bool   `json:"isBig"`
 	ChunkCount   int64  `json:"chunkCount,omitempty"`
 	ParentCount  int64  `json:"parentCount,omitempty"`
-	Text         string `json:"text,omitempty"`
 }
 
 func safeFilename(name string) string {

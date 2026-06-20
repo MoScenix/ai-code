@@ -36,15 +36,7 @@ message SearchFileReq {
 }
 
 message SearchFileResp {
-  repeated SearchHit hits = 1;
-}
-
-message SearchHit {
-  int64 file_id = 1;
-  int64 chunk_id = 2;
-  int64 parent_id = 3;
-  string content = 6;
-  double score = 7;
+  repeated int64 parent_ids = 1;
 }
 
 message DeleteProjectFileDataReq {

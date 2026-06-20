@@ -268,77 +268,16 @@ ReadFieldError:
 }
 
 func (x *SearchFileResp) fastReadField1(buf []byte, _type int8) (offset int, err error) {
-	var v SearchHit
-	offset, err = fastpb.ReadMessage(buf, _type, &v)
-	if err != nil {
-		return offset, err
-	}
-	x.Hits = append(x.Hits, &v)
-	return offset, nil
-}
-
-func (x *SearchHit) FastRead(buf []byte, _type int8, number int32) (offset int, err error) {
-	switch number {
-	case 1:
-		offset, err = x.fastReadField1(buf, _type)
-		if err != nil {
-			goto ReadFieldError
-		}
-	case 2:
-		offset, err = x.fastReadField2(buf, _type)
-		if err != nil {
-			goto ReadFieldError
-		}
-	case 3:
-		offset, err = x.fastReadField3(buf, _type)
-		if err != nil {
-			goto ReadFieldError
-		}
-	case 6:
-		offset, err = x.fastReadField6(buf, _type)
-		if err != nil {
-			goto ReadFieldError
-		}
-	case 7:
-		offset, err = x.fastReadField7(buf, _type)
-		if err != nil {
-			goto ReadFieldError
-		}
-	default:
-		offset, err = fastpb.Skip(buf, _type, number)
-		if err != nil {
-			goto SkipFieldError
-		}
-	}
-	return offset, nil
-SkipFieldError:
-	return offset, fmt.Errorf("%T cannot parse invalid wire-format data, error: %s", x, err)
-ReadFieldError:
-	return offset, fmt.Errorf("%T read field %d '%s' error: %s", x, number, fieldIDToName_SearchHit[number], err)
-}
-
-func (x *SearchHit) fastReadField1(buf []byte, _type int8) (offset int, err error) {
-	x.FileId, offset, err = fastpb.ReadInt64(buf, _type)
-	return offset, err
-}
-
-func (x *SearchHit) fastReadField2(buf []byte, _type int8) (offset int, err error) {
-	x.ChunkId, offset, err = fastpb.ReadInt64(buf, _type)
-	return offset, err
-}
-
-func (x *SearchHit) fastReadField3(buf []byte, _type int8) (offset int, err error) {
-	x.ParentId, offset, err = fastpb.ReadInt64(buf, _type)
-	return offset, err
-}
-
-func (x *SearchHit) fastReadField6(buf []byte, _type int8) (offset int, err error) {
-	x.Content, offset, err = fastpb.ReadString(buf, _type)
-	return offset, err
-}
-
-func (x *SearchHit) fastReadField7(buf []byte, _type int8) (offset int, err error) {
-	x.Score, offset, err = fastpb.ReadDouble(buf, _type)
+	offset, err = fastpb.ReadList(buf, _type,
+		func(buf []byte, _type int8) (n int, err error) {
+			var v int64
+			v, offset, err = fastpb.ReadInt64(buf, _type)
+			if err != nil {
+				return offset, err
+			}
+			x.ParentIds = append(x.ParentIds, v)
+			return offset, err
+		})
 	return offset, err
 }
 
@@ -580,64 +519,15 @@ func (x *SearchFileResp) FastWrite(buf []byte) (offset int) {
 }
 
 func (x *SearchFileResp) fastWriteField1(buf []byte) (offset int) {
-	if x.Hits == nil {
+	if len(x.ParentIds) == 0 {
 		return offset
 	}
-	for i := range x.GetHits() {
-		offset += fastpb.WriteMessage(buf[offset:], 1, x.GetHits()[i])
-	}
-	return offset
-}
-
-func (x *SearchHit) FastWrite(buf []byte) (offset int) {
-	if x == nil {
-		return offset
-	}
-	offset += x.fastWriteField1(buf[offset:])
-	offset += x.fastWriteField2(buf[offset:])
-	offset += x.fastWriteField3(buf[offset:])
-	offset += x.fastWriteField6(buf[offset:])
-	offset += x.fastWriteField7(buf[offset:])
-	return offset
-}
-
-func (x *SearchHit) fastWriteField1(buf []byte) (offset int) {
-	if x.FileId == 0 {
-		return offset
-	}
-	offset += fastpb.WriteInt64(buf[offset:], 1, x.GetFileId())
-	return offset
-}
-
-func (x *SearchHit) fastWriteField2(buf []byte) (offset int) {
-	if x.ChunkId == 0 {
-		return offset
-	}
-	offset += fastpb.WriteInt64(buf[offset:], 2, x.GetChunkId())
-	return offset
-}
-
-func (x *SearchHit) fastWriteField3(buf []byte) (offset int) {
-	if x.ParentId == 0 {
-		return offset
-	}
-	offset += fastpb.WriteInt64(buf[offset:], 3, x.GetParentId())
-	return offset
-}
-
-func (x *SearchHit) fastWriteField6(buf []byte) (offset int) {
-	if x.Content == "" {
-		return offset
-	}
-	offset += fastpb.WriteString(buf[offset:], 6, x.GetContent())
-	return offset
-}
-
-func (x *SearchHit) fastWriteField7(buf []byte) (offset int) {
-	if x.Score == 0 {
-		return offset
-	}
-	offset += fastpb.WriteDouble(buf[offset:], 7, x.GetScore())
+	offset += fastpb.WriteListPacked(buf[offset:], 1, len(x.GetParentIds()),
+		func(buf []byte, numTagOrKey, numIdxOrVal int32) int {
+			offset := 0
+			offset += fastpb.WriteInt64(buf[offset:], numTagOrKey, x.GetParentIds()[numIdxOrVal])
+			return offset
+		})
 	return offset
 }
 
@@ -861,64 +751,15 @@ func (x *SearchFileResp) Size() (n int) {
 }
 
 func (x *SearchFileResp) sizeField1() (n int) {
-	if x.Hits == nil {
+	if len(x.ParentIds) == 0 {
 		return n
 	}
-	for i := range x.GetHits() {
-		n += fastpb.SizeMessage(1, x.GetHits()[i])
-	}
-	return n
-}
-
-func (x *SearchHit) Size() (n int) {
-	if x == nil {
-		return n
-	}
-	n += x.sizeField1()
-	n += x.sizeField2()
-	n += x.sizeField3()
-	n += x.sizeField6()
-	n += x.sizeField7()
-	return n
-}
-
-func (x *SearchHit) sizeField1() (n int) {
-	if x.FileId == 0 {
-		return n
-	}
-	n += fastpb.SizeInt64(1, x.GetFileId())
-	return n
-}
-
-func (x *SearchHit) sizeField2() (n int) {
-	if x.ChunkId == 0 {
-		return n
-	}
-	n += fastpb.SizeInt64(2, x.GetChunkId())
-	return n
-}
-
-func (x *SearchHit) sizeField3() (n int) {
-	if x.ParentId == 0 {
-		return n
-	}
-	n += fastpb.SizeInt64(3, x.GetParentId())
-	return n
-}
-
-func (x *SearchHit) sizeField6() (n int) {
-	if x.Content == "" {
-		return n
-	}
-	n += fastpb.SizeString(6, x.GetContent())
-	return n
-}
-
-func (x *SearchHit) sizeField7() (n int) {
-	if x.Score == 0 {
-		return n
-	}
-	n += fastpb.SizeDouble(7, x.GetScore())
+	n += fastpb.SizeListPacked(1, len(x.GetParentIds()),
+		func(numTagOrKey, numIdxOrVal int32) int {
+			n := 0
+			n += fastpb.SizeInt64(numTagOrKey, x.GetParentIds()[numIdxOrVal])
+			return n
+		})
 	return n
 }
 
@@ -986,15 +827,7 @@ var fieldIDToName_SearchFileReq = map[int32]string{
 }
 
 var fieldIDToName_SearchFileResp = map[int32]string{
-	1: "Hits",
-}
-
-var fieldIDToName_SearchHit = map[int32]string{
-	1: "FileId",
-	2: "ChunkId",
-	3: "ParentId",
-	6: "Content",
-	7: "Score",
+	1: "ParentIds",
 }
 
 var fieldIDToName_DeleteProjectFileDataReq = map[int32]string{

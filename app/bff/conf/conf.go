@@ -44,16 +44,16 @@ type Redis struct {
 }
 
 type Hertz struct {
-	Service         string `yaml:"service"`
-	Address         string `yaml:"address"`
-	EnablePprof     bool   `yaml:"enable_pprof"`
-	EnableGzip      bool   `yaml:"enable_gzip"`
-	EnableAccessLog bool   `yaml:"enable_access_log"`
-	LogLevel        string `yaml:"log_level"`
-	LogFileName     string `yaml:"log_file_name"`
-	LogMaxSize      int    `yaml:"log_max_size"`
-	LogMaxBackups   int    `yaml:"log_max_backups"`
-	LogMaxAge       int    `yaml:"log_max_age"`
+	Service            string `yaml:"service"`
+	Address            string `yaml:"address"`
+	MaxRequestBodySize int    `yaml:"max_request_body_size"`
+	EnablePprof        bool   `yaml:"enable_pprof"`
+	EnableGzip         bool   `yaml:"enable_gzip"`
+	LogLevel           string `yaml:"log_level"`
+	LogFileName        string `yaml:"log_file_name"`
+	LogMaxSize         int    `yaml:"log_max_size"`
+	LogMaxBackups      int    `yaml:"log_max_backups"`
+	LogMaxAge          int    `yaml:"log_max_age"`
 }
 
 type Static struct {
@@ -102,8 +102,15 @@ func initConf() {
 	}
 
 	conf.Env = GetEnv()
+	normalizeConfig(conf)
 
 	pretty.Printf("%+v\n", conf)
+}
+
+func normalizeConfig(conf *Config) {
+	if conf.Hertz.MaxRequestBodySize <= 0 {
+		conf.Hertz.MaxRequestBodySize = 200 << 20
+	}
 }
 
 func GetEnv() string {

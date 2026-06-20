@@ -8,6 +8,7 @@ import (
 	lapp "github.com/MoScenix/ai-code/app/bff/hertz_gen/bff/app"
 	"github.com/cloudwego/hertz/pkg/app"
 	"github.com/cloudwego/hertz/pkg/protocol/consts"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 // AddApp .
@@ -452,6 +453,7 @@ func AddFile(ctx context.Context, c *app.RequestContext) {
 	resp, err := service.NewAddFileService(ctx, c).Run(&req)
 
 	if err != nil {
+		klog.CtxErrorf(ctx, "event=file.upload.failed app_id=%d err=%v", req.AppId, err)
 		utils.SendErrResponse(ctx, c, consts.StatusOK, err)
 		return
 	}

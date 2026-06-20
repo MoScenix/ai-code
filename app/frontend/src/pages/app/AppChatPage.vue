@@ -1,16 +1,7 @@
 <template>
   <div class="h-screen w-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
     <header
-      class="h-16 flex items-center justify-between px-6 bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
-      <div class="flex items-center gap-3">
-        <div class="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center shadow-lg shadow-blue-200">
-          <GlobalOutlined class="text-white text-lg" />
-        </div>
-        <h1 class="text-lg font-bold bg-clip-text text-transparent bg-gradient-to-r from-slate-900 to-slate-500">
-          {{ appInfo?.appName || '网站生成器' }}
-        </h1>
-      </div>
-
+      class="h-16 flex items-center justify-end px-6 bg-white/80 backdrop-blur-md border-b border-slate-200 z-10">
       <div class="flex items-center gap-2">
         <a-button type="text" @click="showAppDetail" class="!flex !items-center hover:!bg-slate-100 !rounded-full">
           <template #icon>
@@ -61,7 +52,22 @@
             <div v-else-if="item.type === 'user'" class="message-row user-row">
               <div class="user-message">
                 <div v-if="item.isPush" class="push-label">push</div>
-                <MarkdownRenderer class="message-markdown user-markdown" :content="item.content.trimEnd()" />
+                <div
+                  v-if="item.isFile && item.fileMeta"
+                  class="file-message"
+                  @dblclick="openFileMessage(item.fileMeta)"
+                >
+                  <FileTextOutlined class="file-icon" />
+                  <div class="file-main">
+                    <div class="file-name">{{ item.fileMeta.filename || '未命名文件' }}</div>
+                    <div class="file-meta">
+                      <span>{{ formatFileSize(item.fileMeta.size) }}</span>
+                      <span>{{ item.fileMeta.isBig ? '已分块' : '已解析' }}</span>
+                      <span v-if="item.fileMeta.parentCount">{{ item.fileMeta.parentCount }} 个父块</span>
+                    </div>
+                  </div>
+                </div>
+                <MarkdownRenderer v-else class="message-markdown user-markdown" :content="item.content.trimEnd()" />
               </div>
             </div>
 
@@ -102,7 +108,7 @@
                     </details>
                   </div>
                 </template>
-                <div v-if="item.loading && !item.content" class="assistant-loading">
+                <div v-if="item.loading" class="assistant-loading">
                   <span class="loading-dot"></span>
                   <span>{{ aiState?.status || 'unknown' }}</span>
                 </div>
@@ -174,6 +180,7 @@
             v-if="!currentQuestion"
             v-model="userInput"
             :is-loading="isGenerating"
+            :is-submitting="sendingMessage"
             :disabled="!isOwner && !isAdmin"
             :placeholder="getInputPlaceholder()"
             @send="handleSendMessage"
@@ -282,9 +289,10 @@ import MarkdownRenderer from '@/components/MarkdownRenderer.vue'
 import PromptInputBox from '@/components/PromptInputBox.vue'
 import AppDetailModal from '@/components/AppDetailModal.vue'
 import DeploySuccessModal from '@/components/DeploySuccessModal.vue'
-import { getStaticPreviewUrl } from '@/config/env'
+import { STATIC_BASE_URL, getStaticPreviewUrl } from '@/config/env'
 import { VisualEditor, type ElementInfo } from '@/utils/visualEditor'
-import { useAIEvents, type AIMessage } from '@/composables/useAIEvents'
+import { getRequestErrorMessage, getResponseErrorMessage } from '@/utils/requestError'
+import { useAIEvents, type AIFileMeta, type AIMessage } from '@/composables/useAIEvents'
 
 import {
   CloudUploadOutlined,
@@ -293,6 +301,7 @@ import {
   InfoCircleOutlined,
   DownloadOutlined,
   EditOutlined,
+  FileTextOutlined,
   GlobalOutlined,
   LockOutlined,
   ReloadOutlined,
@@ -311,6 +320,7 @@ const answerInput = ref('')
 const answerSelections = ref<Record<number, string>>({})
 const currentQuestionIndex = ref(0)
 const answeringQuestion = ref(false)
+const sendingMessage = ref(false)
 const messagesContainer = ref<HTMLElement>()
 
 const {
@@ -391,6 +401,45 @@ const showAppDetail = () => {
   appDetailVisible.value = true
 }
 
+const parseFileMeta = (content?: string): AIFileMeta | undefined => {
+  if (!content) return undefined
+  try {
+    const meta = JSON.parse(content) as AIFileMeta
+    return meta && typeof meta === 'object' ? meta : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const buildHistoryMessage = (chat: API.ChatHistory): AIMessage => {
+  const fileMeta = chat.isFile ? parseFileMeta(chat.message) : undefined
+  return {
+    id: chat.id?.toString() || `${chat.messageType}-${chat.createTime || Math.random()}`,
+    type: (chat.messageType === 'user' ? 'user' : 'ai') as 'user' | 'ai',
+    content: fileMeta ? fileMeta.filename || '' : chat.message || '',
+    createTime: chat.createTime,
+    isFile: Boolean(chat.isFile && fileMeta),
+    fileMeta,
+  }
+}
+
+const openFileMessage = (fileMeta: AIFileMeta) => {
+  if (!appId.value || !fileMeta.fileId || !fileMeta.filename) {
+    message.warning('文件地址不存在')
+    return
+  }
+  const base = STATIC_BASE_URL.replace(/\/$/, '')
+  const filename = fileMeta.filename.split('/').map(encodeURIComponent).join('/')
+  window.open(`${base}/document/${appId.value}/${fileMeta.fileId}/${filename}`, '_blank')
+}
+
+const formatFileSize = (size?: number) => {
+  if (!size || size <= 0) return '未知大小'
+  if (size < 1024) return `${size} B`
+  if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`
+  return `${(size / 1024 / 1024).toFixed(1)} MB`
+}
+
 // 加载对话历史
 const loadChatHistory = async (isLoadMore = false) => {
   if (!appId.value || loadingHistory.value) return
@@ -411,12 +460,7 @@ const loadChatHistory = async (isLoadMore = false) => {
       if (chatHistories.length > 0) {
         // 将对话历史转换为消息格式，并按时间正序排列（老消息在前）
         const historyMessages: AIMessage[] = chatHistories
-          .map((chat) => ({
-            id: chat.id?.toString() || `${chat.messageType}-${chat.createTime || Math.random()}`,
-            type: (chat.messageType === 'user' ? 'user' : 'ai') as 'user' | 'ai',
-            content: chat.message || '',
-            createTime: chat.createTime,
-          }))
+          .map(buildHistoryMessage)
           .reverse() // 反转数组，让老消息在前
         if (isLoadMore) {
           // 加载更多时，将历史消息添加到开头
@@ -471,7 +515,8 @@ const fetchAppInfo = async () => {
       }
       // 检查是否需要自动发送初始提示词
       // 只有在是自己的应用且没有对话历史时才自动发送
-      if (appInfo.value.initPrompt && isOwner.value && messages.value.length === 0 && historyLoaded.value) {
+      const hasNonFileHistory = messages.value.some((item) => !item.isFile)
+      if (appInfo.value.initPrompt && isOwner.value && !hasNonFileHistory && historyLoaded.value) {
         await sendInitialMessage(appInfo.value.initPrompt)
       }
     } else {
@@ -489,30 +534,73 @@ const sendInitialMessage = async (prompt: string) => {
   await handleSendMessage(prompt)
 }
 
-const handleSendMessage = async (rawMessage: string) => {
-  if (!rawMessage.trim()) return
-  let msg = rawMessage.trim()
-  if (selectedElementInfo.value) {
-    let elementContext = `\n\n选中元素信息：`
-    if (selectedElementInfo.value.pagePath) {
-      elementContext += `\n- 页面路径: ${selectedElementInfo.value.pagePath}`
-    }
-    elementContext += `\n- 标签: ${selectedElementInfo.value.tagName.toLowerCase()}\n- 选择器: ${selectedElementInfo.value.selector}`
-    if (selectedElementInfo.value.textContent) {
-      elementContext += `\n- 当前内容: ${selectedElementInfo.value.textContent.substring(0, 100)}`
-    }
-    msg += elementContext
-    clearSelectedElement()
-    if (isEditMode.value) toggleEditMode()
+const uploadProjectFile = async (file: File) => {
+  if (!appId.value) throw new Error('应用ID不存在')
+  const formData = new FormData()
+  formData.append('appId', String(appId.value))
+  formData.append('file', file)
+  const res = await request.post('/app/file/add', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 10 * 60 * 1000,
+  })
+  const data = res.data as API.BaseResponseString | string
+  if (typeof data === 'string') {
+    throw new Error(data)
   }
+  if (data.code !== 0) {
+    throw new Error(getResponseErrorMessage(data, '文件上传失败'))
+  }
+}
 
-  const ok = isGenerating.value ? await pushMessage(msg) : await sendMessage(msg)
-  if (!ok) {
-    message.error(isGenerating.value ? '追加失败' : '提交失败')
+const handleSendMessage = async (rawMessage: string, files: File[] = []) => {
+  if (!rawMessage.trim() && files.length === 0) return
+  if (isGenerating.value && files.length > 0) {
+    message.warning('AI 工作中不能追加文件，请等待当前任务结束')
     return
   }
-  userInput.value = ''
-  updatePreview()
+  if (sendingMessage.value) return
+  sendingMessage.value = true
+  try {
+    for (const file of files) {
+      await uploadProjectFile(file)
+    }
+    if (files.length > 0) {
+      await loadChatHistory()
+    }
+    if (!rawMessage.trim()) {
+      userInput.value = ''
+      return
+    }
+    let msg = rawMessage.trim()
+    if (selectedElementInfo.value) {
+      let elementContext = `\n\n选中元素信息：`
+      if (selectedElementInfo.value.pagePath) {
+        elementContext += `\n- 页面路径: ${selectedElementInfo.value.pagePath}`
+      }
+      elementContext += `\n- 标签: ${selectedElementInfo.value.tagName.toLowerCase()}\n- 选择器: ${selectedElementInfo.value.selector}`
+      if (selectedElementInfo.value.textContent) {
+        elementContext += `\n- 当前内容: ${selectedElementInfo.value.textContent.substring(0, 100)}`
+      }
+      msg += elementContext
+      clearSelectedElement()
+      if (isEditMode.value) toggleEditMode()
+    }
+
+    const ok = isGenerating.value ? await pushMessage(msg) : await sendMessage(msg)
+    if (!ok) {
+      message.error(isGenerating.value ? '追加失败' : '提交失败')
+      return
+    }
+    userInput.value = ''
+    updatePreview()
+  } catch (error) {
+    console.error(files.length > 0 ? '文件上传失败：' : '消息提交失败：', error)
+    message.error(getRequestErrorMessage(error, files.length > 0 ? '文件上传失败' : '提交失败'))
+  } finally {
+    sendingMessage.value = false
+  }
 }
 
 const selectAnswerOption = (option: string) => {
@@ -915,6 +1003,50 @@ onUnmounted(() => {
 
 .user-markdown {
   line-height: 1.55;
+}
+
+.file-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 240px;
+  max-width: 360px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.file-message:hover .file-name {
+  color: #2563eb;
+}
+
+.file-icon {
+  flex: 0 0 auto;
+  color: #2563eb;
+  font-size: 22px;
+}
+
+.file-main {
+  min-width: 0;
+}
+
+.file-name {
+  overflow: hidden;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 11px;
+  line-height: 1.4;
 }
 
 .assistant-markdown {

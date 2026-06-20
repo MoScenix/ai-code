@@ -2,11 +2,13 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { message } from 'ant-design-vue'
-import { SendOutlined, ThunderboltOutlined } from '@ant-design/icons-vue'
+import { CloseOutlined, PaperClipOutlined, SendOutlined, ThunderboltOutlined } from '@ant-design/icons-vue'
 import { useLoginUserStore } from '@/stores/loginUser'
 import { addApp, listMyAppVoByPage, listGoodAppVoByPage } from '@/api/appController'
 import { getDeployUrl } from '@/config/env'
 import AppCard from '@/components/AppCard.vue'
+import request from '@/request'
+import { getRequestErrorMessage, getResponseErrorMessage } from '@/utils/requestError'
 
 const router = useRouter()
 const loginUserStore = useLoginUserStore()
@@ -14,6 +16,8 @@ const loginUserStore = useLoginUserStore()
 // 用户提示词
 const userPrompt = ref('')
 const creating = ref(false)
+const selectedFile = ref<File | null>(null)
+const fileInputRef = ref<HTMLInputElement>()
 
 // 我的应用数据
 const myApps = ref<API.AppVO[]>([])
@@ -38,6 +42,46 @@ const setPrompt = (prompt: string) => {
 
 // 优化提示词功能已移除
 
+const isSupportedFile = (file: File) => {
+  const name = file.name.toLowerCase()
+  return name.endsWith('.pdf') || name.endsWith('.txt') || file.type === 'application/pdf' || file.type === 'text/plain'
+}
+
+const chooseFile = () => {
+  fileInputRef.value?.click()
+}
+
+const onFileChange = () => {
+  const file = fileInputRef.value?.files?.[0]
+  if (file) {
+    if (!isSupportedFile(file)) {
+      message.warning('仅支持 PDF 或 TXT 文件')
+    } else {
+      selectedFile.value = file
+    }
+  }
+  if (fileInputRef.value) fileInputRef.value.value = ''
+}
+
+const uploadProjectFile = async (appId: string, file: File) => {
+  const formData = new FormData()
+  formData.append('appId', appId)
+  formData.append('file', file)
+  const res = await request.post('/app/file/add', formData, {
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 10 * 60 * 1000,
+  })
+  const data = res.data as API.BaseResponseString | string
+  if (typeof data === 'string') {
+    throw new Error(data)
+  }
+  if (data.code !== 0) {
+    throw new Error(getResponseErrorMessage(data, '文件上传失败'))
+  }
+}
+
 // 创建应用
 const createApp = async () => {
   if (!userPrompt.value.trim()) {
@@ -58,9 +102,21 @@ const createApp = async () => {
     })
 
     if (res.data.code === 0 && res.data.data) {
-      message.success('应用创建成功')
       // 跳转到对话页面，确保ID是字符串类型
       const appId = String(res.data.data)
+      const fileToUpload = selectedFile.value
+      if (fileToUpload) {
+        try {
+          await uploadProjectFile(appId, fileToUpload)
+          selectedFile.value = null
+          message.success('应用创建成功，文件已上传')
+        } catch (error) {
+          console.error('首次创建文件上传失败：', error)
+          message.error(`应用已创建，但${getRequestErrorMessage(error, '文件上传失败')}`)
+        }
+      } else {
+        message.success('应用创建成功')
+      }
       await router.push(`/app/chat/${appId}`)
     } else {
       message.error('创建失败：' + res.data.message)
@@ -177,7 +233,34 @@ onMounted(() => {
             class="prompt-input"
             @keydown.enter.prevent="(e: KeyboardEvent) => !e.shiftKey && createApp()"
           />
+          <div v-if="selectedFile" class="file-chip">
+            <PaperClipOutlined />
+            <span class="file-name">{{ selectedFile.name }}</span>
+            <button class="file-remove" type="button" @click="selectedFile = null">
+              <CloseOutlined />
+            </button>
+          </div>
           <div class="input-actions">
+            <a-button
+              type="text"
+              shape="circle"
+              size="large"
+              class="upload-btn"
+              :disabled="creating"
+              @click="chooseFile"
+            >
+              <template #icon>
+                <PaperClipOutlined :style="{ fontSize: '18px' }" />
+              </template>
+            </a-button>
+            <input
+              ref="fileInputRef"
+              type="file"
+              accept=".pdf,.txt,application/pdf,text/plain"
+              class="file-input"
+              :disabled="creating"
+              @change="onFileChange"
+            />
             <a-button
               type="primary"
               shape="circle"
@@ -532,6 +615,70 @@ onMounted(() => {
   border: 1px solid rgba(226, 232, 240, 0.6);
 }
 
+.upload-btn {
+  width: 40px;
+  height: 40px;
+  color: #64748b;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.upload-btn:hover:not(:disabled) {
+  color: #1e293b;
+  background: #e2e8f0;
+}
+
+.file-input {
+  display: none;
+}
+
+.file-chip {
+  position: absolute;
+  left: 18px;
+  bottom: 18px;
+  max-width: calc(100% - 170px);
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px 0 10px;
+  border: 1px solid rgba(203, 213, 225, 0.8);
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.95);
+  color: #475569;
+  font-size: 13px;
+  z-index: 3;
+}
+
+.file-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-remove {
+  width: 18px;
+  height: 18px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+}
+
+.file-remove:hover {
+  color: #334155;
+  background: #e2e8f0;
+}
+
 .send-btn {
   width: 40px;
   height: 40px;
@@ -678,6 +825,10 @@ onMounted(() => {
 
   .quick-actions {
     justify-content: center;
+  }
+
+  .file-chip {
+    max-width: calc(100% - 120px);
   }
 }
 </style>

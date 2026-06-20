@@ -22,7 +22,6 @@ import (
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/hertz-contrib/cors"
 	"github.com/hertz-contrib/gzip"
-	"github.com/hertz-contrib/logger/accesslog"
 	hertzlogrus "github.com/hertz-contrib/logger/logrus"
 	hertztracing "github.com/hertz-contrib/obs-opentelemetry/tracing"
 	"github.com/hertz-contrib/pprof"
@@ -45,6 +44,7 @@ func main() {
 	h := server.New(
 		tracer,
 		server.WithHostPorts(address),
+		server.WithMaxRequestBodySize(conf.GetConf().Hertz.MaxRequestBodySize),
 	)
 	rpc.Init()
 	registerMiddleware(h, traceCfg)
@@ -103,11 +103,6 @@ func registerMiddleware(h *server.Hertz, traceCfg *hertztracing.Config) {
 	// gzip
 	if conf.GetConf().Hertz.EnableGzip {
 		h.Use(gzip.Gzip(gzip.DefaultCompression))
-	}
-
-	// access log
-	if conf.GetConf().Hertz.EnableAccessLog {
-		h.Use(accesslog.New())
 	}
 
 	// recovery
