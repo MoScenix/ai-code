@@ -8,23 +8,21 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/MoScenix/ai-code/common/filestore"
 	"github.com/MoScenix/ai-code/common/filestore/base"
 )
 
-const (
-	metaSuffix = ".meta.json"
-)
+const metaSuffix = ".meta.json"
 
+// LocalCacheStore implements CacheStore over a local filesystem cache in front
+// of a base store. The cache directory mirrors the remote, so no locks needed.
 type LocalCacheStore struct {
 	actual     base.Store
 	cacheDir   string
 	ttl        time.Duration
 	needsFlush bool
-	mu         sync.Mutex
 }
 
 type objectMeta struct {
@@ -61,33 +59,25 @@ func (s *LocalCacheStore) Read(ctx context.Context, key string) ([]byte, error) 
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-
-	s.mu.Lock()
 	obj, err := s.loadObject(key)
 	if errors.Is(err, filestore.ErrNotFound) {
-		s.mu.Unlock()
 		return s.actual.Read(ctx, key)
 	}
 	if err != nil {
-		s.mu.Unlock()
 		return nil, err
 	}
 	if expired(obj.meta) {
 		_ = s.removeObjectPath(obj)
-		s.mu.Unlock()
 		return s.actual.Read(ctx, key)
 	}
 	if obj.meta.Deleted {
-		s.mu.Unlock()
 		return nil, filestore.ErrNotFound
 	}
 	data, err := os.ReadFile(obj.cachePath)
 	if errors.Is(err, os.ErrNotExist) {
 		_ = s.removeObjectPath(obj)
-		s.mu.Unlock()
 		return s.actual.Read(ctx, key)
 	}
-	s.mu.Unlock()
 	return data, err
 }
 
@@ -101,10 +91,6 @@ func (s *LocalCacheStore) Write(ctx context.Context, key string, data []byte) er
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-
 	obj := s.objectForKey(key)
 	if err := s.validateObjectPath(obj); err != nil {
 		return err
@@ -121,10 +107,7 @@ func (s *LocalCacheStore) Write(ctx context.Context, key string, data []byte) er
 	}
 	now := time.Now()
 	obj.meta = objectMeta{
-		Key:       cleanKey(key),
-		Dirty:     true,
-		UpdatedAt: now,
-		ExpiresAt: now.Add(s.ttl),
+		Key: cleanKey(key), Dirty: true, UpdatedAt: now, ExpiresAt: now.Add(s.ttl),
 	}
 	return s.saveMeta(obj)
 }
@@ -143,7 +126,6 @@ func (s *LocalCacheStore) List(ctx context.Context, prefix string) ([]filestore.
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
-
 	result := make(map[string]filestore.ObjectInfo)
 	actualInfos, err := s.actual.List(ctx, prefix)
 	if err != nil && !errors.Is(err, filestore.ErrNotFound) {
@@ -152,11 +134,10 @@ func (s *LocalCacheStore) List(ctx context.Context, prefix string) ([]filestore.
 	for _, info := range actualInfos {
 		result[info.Key] = info
 	}
-
-	s.mu.Lock()
-	objects, err := s.scanObjects()
+	// Non-recursive scan: only immediate children under prefix.
+	// Deeper dirty files are collapsed into directory entries by directChild.
+	objects, err := s.scanObjectsUnder(prefix, false)
 	if err != nil {
-		s.mu.Unlock()
 		return nil, err
 	}
 	for _, obj := range objects {
@@ -168,17 +149,19 @@ func (s *LocalCacheStore) List(ctx context.Context, prefix string) ([]filestore.
 			continue
 		}
 		if child, ok := directChild(prefix, obj.meta.Key); ok {
-			info := s.objectInfoForChild(prefix, child, obj)
-			result[info.Key] = info
+			result[joinKey(prefix, child)] = s.childInfo(prefix, child, obj)
 		}
 	}
-	s.mu.Unlock()
-
 	infos := make([]filestore.ObjectInfo, 0, len(result))
 	for _, info := range result {
 		infos = append(infos, info)
 	}
-	sortObjectInfos(infos)
+	sort.Slice(infos, func(i, j int) bool {
+		if infos[i].IsDir != infos[j].IsDir {
+			return infos[i].IsDir
+		}
+		return infos[i].Name < infos[j].Name
+	})
 	if len(infos) == 0 && errors.Is(err, filestore.ErrNotFound) {
 		return nil, filestore.ErrNotFound
 	}
@@ -192,46 +175,20 @@ func (s *LocalCacheStore) Stat(ctx context.Context, key string) (filestore.Objec
 	if err := ctx.Err(); err != nil {
 		return filestore.ObjectInfo{}, err
 	}
-
-	s.mu.Lock()
 	obj, err := s.loadObject(key)
 	if err == nil {
 		if expired(obj.meta) {
 			_ = s.removeObjectPath(obj)
-			s.mu.Unlock()
 			return s.actual.Stat(ctx, key)
 		}
-		info, err := cacheFileInfo(obj)
-		s.mu.Unlock()
-		return info, err
+		return cacheFileInfo(obj)
 	}
 	if !errors.Is(err, filestore.ErrNotFound) {
-		s.mu.Unlock()
 		return filestore.ObjectInfo{}, err
 	}
-
-	objects, err := s.scanObjects()
-	if err != nil {
-		s.mu.Unlock()
-		return filestore.ObjectInfo{}, err
+	if info, ok := s.statDir(key); ok {
+		return info, nil
 	}
-	clean := cleanKey(key)
-	for _, obj := range objects {
-		if expired(obj.meta) {
-			_ = s.removeObjectPath(obj)
-			continue
-		}
-		if strings.HasPrefix(obj.meta.Key, ensureTrailingSlash(clean)) {
-			s.mu.Unlock()
-			return filestore.ObjectInfo{
-				Key:     clean,
-				Name:    filepath.Base(clean),
-				IsDir:   true,
-				ModTime: obj.meta.UpdatedAt,
-			}, nil
-		}
-	}
-	s.mu.Unlock()
 	return s.actual.Stat(ctx, key)
 }
 
@@ -242,12 +199,10 @@ func (s *LocalCacheStore) Flush(ctx context.Context, path string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-
 	path = cleanKey(path)
-	s.mu.Lock()
-	objects, err := s.scanObjects()
+	// Recursive walk: find all dirty files under path (including subdirs).
+	objects, err := s.scanObjectsUnder(path, true)
 	if err != nil {
-		s.mu.Unlock()
 		return err
 	}
 	var targets []cachedObject
@@ -257,18 +212,19 @@ func (s *LocalCacheStore) Flush(ctx context.Context, path string) error {
 		}
 		if expired(obj.meta) {
 			_ = s.removeObjectPath(obj)
-			s.mu.Unlock()
 			return filestore.ErrCacheExpired
 		}
 		if obj.meta.Dirty && !obj.meta.Deleted {
 			targets = append(targets, obj)
 		}
 	}
-	sort.Slice(targets, func(i int, j int) bool {
-		return targets[i].meta.Key < targets[j].meta.Key
-	})
-	s.mu.Unlock()
-
+	// If path is a single file (not a directory), scanObjectsUnder won't find
+	// it — check the exact path too.
+	obj, err := s.loadObject(path)
+	if err == nil && !expired(obj.meta) && obj.meta.Dirty && !obj.meta.Deleted {
+		targets = append(targets, obj)
+	}
+	sort.Slice(targets, func(i, j int) bool { return targets[i].meta.Key < targets[j].meta.Key })
 	for _, obj := range targets {
 		if err := ctx.Err(); err != nil {
 			return err
@@ -280,25 +236,154 @@ func (s *LocalCacheStore) Flush(ctx context.Context, path string) error {
 		if err := s.actual.Write(ctx, obj.meta.Key, data); err != nil {
 			return err
 		}
-		s.mu.Lock()
 		if err := s.removeObjectPath(obj); err != nil {
-			s.mu.Unlock()
 			return err
 		}
-		s.mu.Unlock()
 	}
 	return nil
 }
+
+// --- scan helpers ---
+
+// scanObjectsUnder finds cached entries under prefix. When recursive is true
+// (Flush), walks the full subtree; when false (List), only reads the immediate
+// directory and returns subdirectories as lightweight markers.
+func (s *LocalCacheStore) scanObjectsUnder(prefix string, recursive bool) ([]cachedObject, error) {
+	baseDir := filepath.Join(s.cacheDir, filepath.FromSlash(prefix))
+	if recursive {
+		return s.scanWalkDir(baseDir)
+	}
+	return s.scanReadDir(baseDir, prefix)
+}
+
+func (s *LocalCacheStore) scanWalkDir(baseDir string) ([]cachedObject, error) {
+	var objects []cachedObject
+	err := filepath.WalkDir(baseDir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), metaSuffix) {
+			return nil
+		}
+		obj, err := s.readMeta(path)
+		if err != nil {
+			return err
+		}
+		objects = append(objects, obj)
+		return nil
+	})
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	return objects, err
+}
+
+func (s *LocalCacheStore) scanReadDir(baseDir, prefix string) ([]cachedObject, error) {
+	entries, err := os.ReadDir(baseDir)
+	if errors.Is(err, os.ErrNotExist) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	var objects []cachedObject
+	for _, entry := range entries {
+		fullPath := filepath.Join(baseDir, entry.Name())
+		if entry.IsDir() {
+			fi, _ := entry.Info()
+			objects = append(objects, cachedObject{
+				cachePath: fullPath,
+				meta: objectMeta{
+					Key: cleanKey(filepath.ToSlash(filepath.Join(prefix, entry.Name()))),
+					Dirty: true, UpdatedAt: fi.ModTime(),
+				},
+			})
+			continue
+		}
+		if !strings.HasSuffix(entry.Name(), metaSuffix) {
+			continue
+		}
+		obj, err := s.readMeta(fullPath)
+		if err != nil {
+			return nil, err
+		}
+		objects = append(objects, obj)
+	}
+	return objects, nil
+}
+
+// readMeta reads a .meta.json file and returns a populated cachedObject.
+func (s *LocalCacheStore) readMeta(path string) (cachedObject, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return cachedObject{}, err
+	}
+	var meta objectMeta
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return cachedObject{}, err
+	}
+	cachePath := strings.TrimSuffix(path, metaSuffix)
+	if meta.Key == "" {
+		if rel, err := filepath.Rel(s.cacheDir, cachePath); err == nil {
+			meta.Key = cleanKey(filepath.ToSlash(rel))
+		}
+	}
+	return cachedObject{metaPath: path, cachePath: cachePath, meta: meta}, nil
+}
+
+// childInfo builds an ObjectInfo for a child entry under prefix.
+// The child is a directory when the key is nested deeper (recursive scan) or
+// when cachePath points to an actual directory on disk (non-recursive scan).
+func (s *LocalCacheStore) childInfo(prefix, child string, obj cachedObject) filestore.ObjectInfo {
+	key := joinKey(prefix, child)
+	cleanPrefix := cleanKey(prefix)
+	// key has more segments past child → it's a directory in the listing
+	if strings.Contains(strings.TrimPrefix(obj.meta.Key, ensureTrailingSlash(cleanPrefix)), "/") {
+		return filestore.ObjectInfo{Key: key, Name: child, IsDir: true, ModTime: obj.meta.UpdatedAt}
+	}
+	if fi, err := os.Stat(obj.cachePath); err == nil && fi.IsDir() {
+		return filestore.ObjectInfo{Key: key, Name: child, IsDir: true, ModTime: obj.meta.UpdatedAt}
+	}
+	return fileObjectInfo(key, child, obj)
+}
+
+// statDir checks if key is a directory prefix in the local cache by looking at
+// the immediate entries under cacheDir/key.
+func (s *LocalCacheStore) statDir(key string) (filestore.ObjectInfo, bool) {
+	entries, err := os.ReadDir(filepath.Join(s.cacheDir, filepath.FromSlash(key)))
+	if err != nil {
+		return filestore.ObjectInfo{}, false
+	}
+	ck := cleanKey(key)
+	var latest time.Time
+	for _, e := range entries {
+		if e.IsDir() {
+			if fi, err := e.Info(); err == nil && fi.ModTime().After(latest) {
+				latest = fi.ModTime()
+			}
+			continue
+		}
+		if strings.HasSuffix(e.Name(), metaSuffix) {
+			obj, rerr := s.readMeta(filepath.Join(s.cacheDir, filepath.FromSlash(key), e.Name()))
+			if rerr == nil && !obj.meta.Deleted && !expired(obj.meta) && obj.meta.UpdatedAt.After(latest) {
+				latest = obj.meta.UpdatedAt
+			}
+		}
+	}
+	if latest.IsZero() {
+		return filestore.ObjectInfo{}, false
+	}
+	return filestore.ObjectInfo{Key: ck, Name: filepath.Base(ck), IsDir: true, ModTime: latest}, true
+}
+
+// --- key/path utils ---
 
 func (s *LocalCacheStore) objectForKey(key string) cachedObject {
 	key = cleanKey(key)
 	cachePath := filepath.Join(s.cacheDir, filepath.FromSlash(key))
 	return cachedObject{
-		metaPath:  cachePath + metaSuffix,
-		cachePath: cachePath,
-		meta: objectMeta{
-			Key: key,
-		},
+		metaPath: cachePath + metaSuffix, cachePath: cachePath,
+		meta: objectMeta{Key: key},
 	}
 }
 
@@ -354,8 +439,6 @@ func (s *LocalCacheStore) saveMeta(obj cachedObject) error {
 }
 
 func (s *LocalCacheStore) removeObject(key string) error {
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	obj := s.objectForKey(key)
 	if err := s.validateObjectPath(obj); err != nil {
 		return err
@@ -373,69 +456,23 @@ func (s *LocalCacheStore) removeObjectPath(obj cachedObject) error {
 	return nil
 }
 
-func (s *LocalCacheStore) scanObjects() ([]cachedObject, error) {
-	var objects []cachedObject
-	err := filepath.WalkDir(s.cacheDir, func(path string, entry os.DirEntry, err error) error {
-		if err != nil {
-			return err
-		}
-		if entry.IsDir() || !strings.HasSuffix(entry.Name(), metaSuffix) {
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return err
-		}
-		var meta objectMeta
-		if err := json.Unmarshal(data, &meta); err != nil {
-			return err
-		}
-		cachePath := strings.TrimSuffix(path, metaSuffix)
-		if meta.Key == "" {
-			rel, err := filepath.Rel(s.cacheDir, cachePath)
-			if err != nil {
-				return err
-			}
-			meta.Key = cleanKey(filepath.ToSlash(rel))
-		}
-		objects = append(objects, cachedObject{
-			metaPath:  path,
-			cachePath: cachePath,
-			meta:      meta,
-		})
-		return nil
-	})
-	if errors.Is(err, os.ErrNotExist) {
-		return nil, nil
-	}
-	return objects, err
-}
+// --- file info ---
 
-func (s *LocalCacheStore) objectInfoForChild(prefix string, child string, obj cachedObject) filestore.ObjectInfo {
-	key := joinKey(prefix, child)
-	if strings.Contains(strings.TrimPrefix(strings.TrimPrefix(obj.meta.Key, cleanKey(prefix)), "/"), "/") {
-		return filestore.ObjectInfo{
-			Key:     key,
-			Name:    child,
-			IsDir:   true,
-			ModTime: obj.meta.UpdatedAt,
-		}
+func fileObjectInfo(key, name string, obj cachedObject) filestore.ObjectInfo {
+	fi, err := os.Stat(obj.cachePath)
+	if errors.Is(err, os.ErrNotExist) {
+		return filestore.ObjectInfo{Key: key, Name: name, ModTime: obj.meta.UpdatedAt}
 	}
-	info, err := cacheFileInfo(obj)
 	if err != nil {
-		return filestore.ObjectInfo{
-			Key:     key,
-			Name:    child,
-			ModTime: obj.meta.UpdatedAt,
-		}
+		return filestore.ObjectInfo{Key: key, Name: name, ModTime: obj.meta.UpdatedAt}
 	}
-	info.Key = key
-	info.Name = child
-	return info
+	return filestore.ObjectInfo{
+		Key: key, Name: name, Size: fi.Size(), ModTime: obj.meta.UpdatedAt,
+	}
 }
 
 func cacheFileInfo(obj cachedObject) (filestore.ObjectInfo, error) {
-	info, err := os.Stat(obj.cachePath)
+	fi, err := os.Stat(obj.cachePath)
 	if errors.Is(err, os.ErrNotExist) {
 		return filestore.ObjectInfo{}, filestore.ErrNotFound
 	}
@@ -443,11 +480,8 @@ func cacheFileInfo(obj cachedObject) (filestore.ObjectInfo, error) {
 		return filestore.ObjectInfo{}, err
 	}
 	return filestore.ObjectInfo{
-		Key:     obj.meta.Key,
-		Name:    filepath.Base(obj.meta.Key),
-		IsDir:   false,
-		Size:    info.Size(),
-		ModTime: obj.meta.UpdatedAt,
+		Key: obj.meta.Key, Name: filepath.Base(obj.meta.Key),
+		Size: fi.Size(), ModTime: obj.meta.UpdatedAt,
 	}, nil
 }
 
@@ -463,9 +497,8 @@ func cleanKey(key string) string {
 	return strings.TrimPrefix(key, "/")
 }
 
-func directChild(prefix string, key string) (string, bool) {
-	prefix = cleanKey(prefix)
-	key = cleanKey(key)
+func directChild(prefix, key string) (string, bool) {
+	prefix, key = cleanKey(prefix), cleanKey(key)
 	if prefix != "" {
 		if key == prefix || !strings.HasPrefix(key, ensureTrailingSlash(prefix)) {
 			return "", false
@@ -476,16 +509,15 @@ func directChild(prefix string, key string) (string, bool) {
 	return child, child != ""
 }
 
-func inScope(prefix string, key string) bool {
-	prefix = cleanKey(prefix)
-	key = cleanKey(key)
+func inScope(prefix, key string) bool {
+	prefix, key = cleanKey(prefix), cleanKey(key)
 	if prefix == "" {
 		return true
 	}
 	return key == prefix || strings.HasPrefix(key, ensureTrailingSlash(prefix))
 }
 
-func joinKey(prefix string, child string) string {
+func joinKey(prefix, child string) string {
 	prefix = cleanKey(prefix)
 	if prefix == "" {
 		return child
@@ -495,20 +527,8 @@ func joinKey(prefix string, child string) string {
 
 func ensureTrailingSlash(key string) string {
 	key = cleanKey(key)
-	if key == "" {
-		return ""
-	}
-	if strings.HasSuffix(key, "/") {
+	if key == "" || strings.HasSuffix(key, "/") {
 		return key
 	}
 	return key + "/"
-}
-
-func sortObjectInfos(infos []filestore.ObjectInfo) {
-	sort.Slice(infos, func(i int, j int) bool {
-		if infos[i].IsDir != infos[j].IsDir {
-			return infos[i].IsDir
-		}
-		return infos[i].Name < infos[j].Name
-	})
 }
