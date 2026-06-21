@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/MoScenix/ai-code/app/document/conf"
+	documentworkpool "github.com/MoScenix/ai-code/app/document/workpool"
 	openaiemb "github.com/cloudwego/eino-ext/components/embedding/openai"
 	"github.com/milvus-io/milvus/client/v2/column"
 	"github.com/milvus-io/milvus/client/v2/entity"
@@ -25,6 +26,9 @@ const (
 	defaultEmbeddingModelName      = "text-embedding-v1"
 	defaultEmbeddingDimensions     = 1536
 	defaultEmbeddingTimeoutSeconds = 60
+	queryEmbeddingBatchSize        = 25
+	queryEmbeddingBatchWait        = 5 * time.Millisecond
+	queryEmbeddingQueueSize        = 4096
 	milvusIDField                  = "id"
 	milvusContentField             = "content"
 	milvusProjectIDField           = "project_id"
@@ -43,7 +47,28 @@ var (
 	embedderOnce     sync.Once
 	qwenEmbedder     *openaiemb.Embedder
 	qwenEmbedderErr  error
+	queryBatcherOnce sync.Once
+	queryBatcher     *queryEmbeddingBatcher
 )
+
+type queryEmbeddingRequest struct {
+	ctx    context.Context
+	text   string
+	result chan queryEmbeddingResult
+}
+
+type queryEmbeddingResult struct {
+	vector []float32
+	err    error
+}
+
+type queryEmbeddingBatcher struct {
+	requests chan queryEmbeddingRequest
+}
+
+type queryEmbeddingTask struct {
+	batch []queryEmbeddingRequest
+}
 
 func insertMilvusChildChunks(ctx context.Context, children []ChildChunk, vectors [][]float32) error {
 	if len(children) == 0 {
@@ -325,17 +350,14 @@ func parentIDsFromColumn(col column.Column, index int) ([]int64, error) {
 }
 
 func embedMilvusText(ctx context.Context, text string) ([]float32, error) {
-	vectors, err := embedMilvusTexts(ctx, []string{text})
-	if err != nil {
-		return nil, err
-	}
-	if len(vectors) != 1 {
-		return nil, fmt.Errorf("embed milvus text returned %d vectors", len(vectors))
-	}
-	return vectors[0], nil
+	return getQueryEmbeddingBatcher().embed(ctx, text)
 }
 
 func embedMilvusTexts(ctx context.Context, texts []string) ([][]float32, error) {
+	return embedMilvusTextsDirect(ctx, texts)
+}
+
+func embedMilvusTextsDirect(ctx context.Context, texts []string) ([][]float32, error) {
 	if len(texts) == 0 {
 		return nil, nil
 	}
@@ -359,6 +381,135 @@ func embedMilvusTexts(ctx context.Context, texts []string) ([][]float32, error) 
 		out = append(out, row)
 	}
 	return out, nil
+}
+
+func getQueryEmbeddingBatcher() *queryEmbeddingBatcher {
+	queryBatcherOnce.Do(func() {
+		queryBatcher = &queryEmbeddingBatcher{
+			requests: make(chan queryEmbeddingRequest, queryEmbeddingQueueSize),
+		}
+		go queryBatcher.collect()
+	})
+	return queryBatcher
+}
+
+func (b *queryEmbeddingBatcher) embed(ctx context.Context, text string) ([]float32, error) {
+	req := queryEmbeddingRequest{
+		ctx:    ctx,
+		text:   text,
+		result: make(chan queryEmbeddingResult, 1),
+	}
+	select {
+	case b.requests <- req:
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+
+	select {
+	case result := <-req.result:
+		return result.vector, result.err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
+}
+
+func (b *queryEmbeddingBatcher) collect() {
+	batch := make([]queryEmbeddingRequest, 0, queryEmbeddingBatchSize)
+	timer := time.NewTimer(queryEmbeddingBatchWait)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	timerActive := false
+
+	flush := func() {
+		if len(batch) == 0 {
+			return
+		}
+		out := make([]queryEmbeddingRequest, len(batch))
+		copy(out, batch)
+		b.submit(out)
+		batch = batch[:0]
+		if timerActive {
+			if !timer.Stop() {
+				select {
+				case <-timer.C:
+				default:
+				}
+			}
+			timerActive = false
+		}
+	}
+
+	for {
+		select {
+		case req := <-b.requests:
+			if req.ctx.Err() != nil {
+				req.result <- queryEmbeddingResult{err: req.ctx.Err()}
+				continue
+			}
+			batch = append(batch, req)
+			if len(batch) == 1 {
+				timer.Reset(queryEmbeddingBatchWait)
+				timerActive = true
+			}
+			if len(batch) >= queryEmbeddingBatchSize {
+				flush()
+			}
+		case <-timer.C:
+			timerActive = false
+			flush()
+		}
+	}
+}
+
+func (b *queryEmbeddingBatcher) submit(batch []queryEmbeddingRequest) {
+	pool, err := documentworkpool.Get()
+	if err != nil {
+		completeQueryEmbeddingBatch(batch, nil, err)
+		return
+	}
+	if err := pool.Submit(context.Background(), &queryEmbeddingTask{batch: batch}); err != nil {
+		completeQueryEmbeddingBatch(batch, nil, err)
+	}
+}
+
+func (t *queryEmbeddingTask) Run(ctx context.Context) error {
+	active := make([]queryEmbeddingRequest, 0, len(t.batch))
+	texts := make([]string, 0, len(t.batch))
+	for _, req := range t.batch {
+		if req.ctx.Err() != nil {
+			req.result <- queryEmbeddingResult{err: req.ctx.Err()}
+			continue
+		}
+		active = append(active, req)
+		texts = append(texts, req.text)
+	}
+	if len(active) == 0 {
+		return nil
+	}
+
+	vectors, err := embedMilvusTextsDirect(ctx, texts)
+	if err != nil {
+		completeQueryEmbeddingBatch(active, nil, err)
+		return err
+	}
+	if len(vectors) != len(active) {
+		err := fmt.Errorf("embed milvus query batch returned %d vectors for %d texts", len(vectors), len(active))
+		completeQueryEmbeddingBatch(active, nil, err)
+		return err
+	}
+	completeQueryEmbeddingBatch(active, vectors, nil)
+	return nil
+}
+
+func completeQueryEmbeddingBatch(batch []queryEmbeddingRequest, vectors [][]float32, err error) {
+	for i, req := range batch {
+		if err != nil {
+			req.result <- queryEmbeddingResult{err: err}
+			continue
+		}
+		req.result <- queryEmbeddingResult{vector: vectors[i]}
+	}
 }
 
 func getQwenEmbedder(ctx context.Context) (*openaiemb.Embedder, error) {
