@@ -19,8 +19,9 @@ type RuntimeState struct {
 
 func NewRuntimeState(cancel context.CancelFunc) *RuntimeState {
 	return &RuntimeState{
-		Buffer: &StringBuffer{},
-		cancel: cancel,
+		Buffer:        &StringBuffer{},
+		controlCursor: "0",
+		cancel:        cancel,
 	}
 }
 

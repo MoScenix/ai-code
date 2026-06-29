@@ -14,6 +14,7 @@ import (
 	"github.com/MoScenix/ai-code/common/redisstream"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
+	"github.com/cloudwego/kitex/pkg/klog"
 )
 
 func publishAgentEvents(ctx context.Context, store redisstream.Store, projectID string, events *adk.AsyncIterator[*adk.TypedAgentEvent[*schema.Message]], lastID *string) (*interruptEvent, string, error) {
@@ -140,8 +141,14 @@ func publishTaskEvent(ctx context.Context, store redisstream.Store, event aieven
 	if event.CreatedAt == 0 {
 		event.CreatedAt = time.Now().UnixMilli()
 	}
+	if event.Type == aievent.EventError {
+		klog.CtxErrorf(ctx, "publish ai error event: project_id=%s agent=%s content=%s", event.ProjectID, event.Agent, event.Content)
+	}
 	id, err := store.Add(ctx, aievent.EventKey(event.ProjectID), event)
 	if err != nil {
+		if event.Type == aievent.EventError {
+			klog.CtxErrorf(ctx, "publish ai error event failed: project_id=%s agent=%s err=%v", event.ProjectID, event.Agent, err)
+		}
 		return "", err
 	}
 	return id, nil
