@@ -20,22 +20,25 @@ func EditFileFunc(ctx context.Context, params *EditFileParams) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	if params == nil {
+		return recoverableFilesystemMessage("edit_file_missing_params", "missing params"), nil
+	}
 	if params.OldString == "" {
-		return `{"ok":false,"error":"empty_old_text","message":"old_string 不能为空。请先读取文件内容，确认要替换的完整文本。"}`, nil
+		return recoverableFilesystemMessage("empty_old_text", "old_string 不能为空。请先读取文件内容，确认要替换的完整文本。"), nil
 	}
 
 	data, err := store.ReadFile(ctx, params.FilePath)
 	if err != nil {
-		return "", err
+		return recoverableFilesystemMessage("edit_file_read_failed", err.Error()), nil
 	}
 
 	content := string(data)
 	count := strings.Count(content, params.OldString)
 	if count == 0 {
-		return `{"ok":false,"error":"text_not_found","message":"目标文本未找到。请先读取文件内容，确认 old_string 完全一致后再调用 edit_file。"}`, nil
+		return recoverableFilesystemMessage("text_not_found", "目标文本未找到。请先读取文件内容，确认 old_string 完全一致后再调用 edit_file。"), nil
 	}
 	if count > 1 && !params.ReplaceAll {
-		return `{"ok":false,"error":"text_not_unique","message":"目标文本出现多次。请提供更长上下文让 old_string 唯一，或设置 replace_all=true。"}`, nil
+		return recoverableFilesystemMessage("text_not_unique", "目标文本出现多次。请提供更长上下文让 old_string 唯一，或设置 replace_all=true。"), nil
 	}
 
 	next := strings.Replace(content, params.OldString, params.NewString, 1)
@@ -43,7 +46,7 @@ func EditFileFunc(ctx context.Context, params *EditFileParams) (string, error) {
 		next = strings.ReplaceAll(content, params.OldString, params.NewString)
 	}
 	if err := store.WriteFile(ctx, params.FilePath, []byte(next)); err != nil {
-		return "", err
+		return recoverableFilesystemMessage("edit_file_write_failed", err.Error()), nil
 	}
 
 	replaced := 1
@@ -51,9 +54,9 @@ func EditFileFunc(ctx context.Context, params *EditFileParams) (string, error) {
 		replaced = count
 	}
 	if replaced > 1 {
-		return `{"ok":true,"message":"Successfully replaced all matching strings."}`, nil
+		return successfulFilesystemMessage("Successfully replaced all matching strings."), nil
 	}
-	return `{"ok":true,"message":"Successfully replaced the string."}`, nil
+	return successfulFilesystemMessage("Successfully replaced the string."), nil
 }
 
 func NewEditFileTool() (tool.InvokableTool, error) {

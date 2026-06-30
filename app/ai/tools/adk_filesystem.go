@@ -2,7 +2,7 @@ package tools
 
 import (
 	"context"
-	"fmt"
+	"encoding/json"
 	"path/filepath"
 	"regexp"
 	"sort"
@@ -25,7 +25,7 @@ func NewProjectFilesystemBackend(store project.Store) *ProjectFilesystemBackend 
 func (b *ProjectFilesystemBackend) LsInfo(ctx context.Context, req *adkfs.LsInfoRequest) ([]adkfs.FileInfo, error) {
 	infos, err := b.store.List(ctx, req.Path)
 	if err != nil {
-		return nil, nil
+		return []adkfs.FileInfo{errorFileInfo("list_files_failed", err)}, nil
 	}
 	result := make([]adkfs.FileInfo, 0, len(infos))
 	for _, info := range infos {
@@ -48,11 +48,7 @@ func (b *ProjectFilesystemBackend) Read(ctx context.Context, req *adkfs.ReadRequ
 }
 
 func (b *ProjectFilesystemBackend) Write(ctx context.Context, req *adkfs.WriteRequest) error {
-	err := b.store.WriteFile(ctx, req.FilePath, []byte(req.Content))
-	if err != nil {
-		return err
-	}
-	return nil
+	return b.store.WriteFile(ctx, req.FilePath, []byte(req.Content))
 }
 
 func (b *ProjectFilesystemBackend) Edit(ctx context.Context, req *adkfs.EditRequest) error {
@@ -78,12 +74,12 @@ func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepR
 	}
 	re, err := regexp.Compile(pattern)
 	if err != nil {
-		return nil, nil
+		return []adkfs.GrepMatch{errorGrepMatch("grep_invalid_pattern", err)}, nil
 	}
 
 	files, err := b.listFiles(ctx, req.Path)
 	if err != nil {
-		return nil, nil
+		return []adkfs.GrepMatch{errorGrepMatch("grep_list_files_failed", err)}, nil
 	}
 
 	var matches []adkfs.GrepMatch
@@ -94,7 +90,7 @@ func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepR
 		if req.Glob != "" {
 			matched, err := matchGlob(req.Glob, info.Key)
 			if err != nil {
-				return nil, nil
+				return []adkfs.GrepMatch{errorGrepMatch("grep_invalid_glob", err)}, nil
 			}
 			if !matched {
 				continue
@@ -103,7 +99,7 @@ func (b *ProjectFilesystemBackend) GrepRaw(ctx context.Context, req *adkfs.GrepR
 
 		data, err := b.store.ReadFile(ctx, info.Key)
 		if err != nil {
-			continue
+			return []adkfs.GrepMatch{errorGrepMatch("grep_read_file_failed", err)}, nil
 		}
 		matches = append(matches, grepContent(info.Key, string(data), re, req)...)
 	}
@@ -124,14 +120,14 @@ func (b *ProjectFilesystemBackend) GlobInfo(ctx context.Context, req *adkfs.Glob
 
 	entries, err := b.listEntries(ctx, req.Path)
 	if err != nil {
-		return nil, nil
+		return []adkfs.FileInfo{errorFileInfo("glob_list_files_failed", err)}, nil
 	}
 
 	result := make([]adkfs.FileInfo, 0)
 	for _, info := range entries {
 		matched, err := matchGlob(req.Pattern, info.Key)
 		if err != nil {
-			return nil, nil
+			return []adkfs.FileInfo{errorFileInfo("glob_invalid_pattern", err)}, nil
 		}
 		if matched {
 			result = append(result, fileInfoFromPath(info))
@@ -145,7 +141,38 @@ func (b *ProjectFilesystemBackend) GlobInfo(ctx context.Context, req *adkfs.Glob
 }
 
 func recoverableFilesystemMessage(code string, message string) string {
-	return fmt.Sprintf(`{"ok":false,"error":"%s","message":"%s"}`, code, strings.ReplaceAll(message, `"`, `\"`))
+	return filesystemMessage(false, code, message)
+}
+
+func successfulFilesystemMessage(message string) string {
+	return filesystemMessage(true, "", message)
+}
+
+func filesystemMessage(ok bool, code string, message string) string {
+	payload := map[string]any{
+		"ok":      ok,
+		"message": message,
+	}
+	if code != "" {
+		payload["error"] = code
+	}
+	data, _ := json.Marshal(payload)
+	return string(data)
+}
+
+func errorFileInfo(code string, err error) adkfs.FileInfo {
+	return adkfs.FileInfo{
+		Path: recoverableFilesystemMessage(code, err.Error()),
+	}
+}
+
+func errorGrepMatch(code string, err error) adkfs.GrepMatch {
+	message := recoverableFilesystemMessage(code, err.Error())
+	return adkfs.GrepMatch{
+		Path:    message,
+		Line:    1,
+		Content: message,
+	}
 }
 
 func (b *ProjectFilesystemBackend) replaceAll(ctx context.Context, path string, oldString string, newString string) error {

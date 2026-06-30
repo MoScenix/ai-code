@@ -1,4 +1,4 @@
-package utils
+package infra
 
 import (
 	"sync"
@@ -34,11 +34,9 @@ func DocumentClient() (documentservice.Client, error) {
 }
 
 func newCommonClientOptions(enableGRPC bool) []client.Option {
-	opts := clientsuit.CommonGrpcClientSuite{
+	return clientsuit.CommonGrpcClientSuite{
 		CurrentServiceName: conf.GetConf().Kitex.Service,
 		RegistryAddr:       conf.GetConf().Registry.RegistryAddress[0],
 		EnableGRPC:         enableGRPC,
 	}.Options()
-
-	return opts
 }

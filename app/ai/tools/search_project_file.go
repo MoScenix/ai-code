@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/MoScenix/ai-code/app/ai/conf"
+	"github.com/MoScenix/ai-code/app/ai/infra"
 	aiutils "github.com/MoScenix/ai-code/app/ai/utils"
 	document "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/document"
 	"github.com/cloudwego/eino/components/tool"
@@ -52,7 +53,7 @@ func SearchProjectFileFunc(ctx context.Context, params *SearchProjectFileParams)
 		return SearchProjectFileResult{Error: fmt.Sprintf("invalid project id: %s", projectIDRaw)}, nil
 	}
 
-	client, err := aiutils.DocumentClient()
+	client, err := infra.DocumentClient()
 	if err != nil {
 		return SearchProjectFileResult{Error: err.Error()}, nil
 	}

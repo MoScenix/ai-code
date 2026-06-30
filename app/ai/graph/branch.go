@@ -19,8 +19,7 @@ const (
 const selectorPromptPath = "prompt/selector/route.prompt"
 
 type routeDecision struct {
-	Route  string `json:"route"`
-	Reason string `json:"reason"`
+	Route string `json:"route"`
 }
 
 // newBranch branch initialization method of node 'start' in graph 'aicode'
@@ -49,14 +48,7 @@ func newBranch(ctx context.Context, input map[string]any) (endNode string, err e
 		return coderNode, nil
 	}
 
-	switch parseRouteJSON(msg.Content) {
-	case designerNode:
-		return designerNode, nil
-	case coderNode:
-		return coderNode, nil
-	default:
-		return coderNode, nil
-	}
+	return parseRouteJSON(msg.Content), nil
 }
 
 func hasUserMessage(messages []*schema.Message) bool {
@@ -73,7 +65,7 @@ func parseRouteJSON(content string) string {
 
 	var decision routeDecision
 	if err := json.Unmarshal([]byte(content), &decision); err != nil {
-		return ""
+		return coderNode
 	}
 	return normalizeRoute(decision.Route)
 }

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/MoScenix/ai-code/app/ai/conf"
+	"github.com/MoScenix/ai-code/app/ai/infra"
 	"github.com/MoScenix/ai-code/common/rpcmeta"
 	rpcapp "github.com/MoScenix/ai-code/rpc_gen/kitex_gen/app"
 	"github.com/cloudwego/eino/schema"
@@ -51,7 +52,7 @@ func addChatMessage(ctx context.Context, appID int64, role string, content strin
 		return nil
 	}
 
-	client, err := AppClient()
+	client, err := infra.AppClient()
 	if err != nil {
 		klog.CtxErrorf(ctx, "get app client failed while saving ai message: app_id=%d role=%s err=%v", appID, role, err)
 		return err
@@ -99,7 +100,7 @@ func LoadChatHistoryWithLimit(ctx context.Context, appID int64, limit int64) ([]
 		limit = defaultHistoryLimit
 	}
 
-	client, err := AppClient()
+	client, err := infra.AppClient()
 	if err != nil {
 		return nil, err
 	}

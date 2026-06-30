@@ -69,10 +69,11 @@ func NewDesigner(ctx context.Context) (*adk.ChatModelAgent, error) {
 	}
 
 	return adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name:        "designer",
-		Description: "Clarifies requirements and produces a design plan before coding.",
-		Instruction: string(instruction),
-		Model:       cm,
+		Name:             "designer",
+		Description:      "Clarifies requirements and produces a design plan before coding.",
+		Instruction:      string(instruction),
+		Model:            cm,
+		ModelRetryConfig: modelRetryConfig(),
 		ToolsConfig: adk.ToolsConfig{
 			ToolsNodeConfig: compose.ToolsNodeConfig{
 				Tools: []tool.BaseTool{askTool, searchTool},
