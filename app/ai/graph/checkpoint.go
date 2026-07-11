@@ -42,8 +42,10 @@ func (s *graphCheckpointStore) Set(ctx context.Context, checkpointID string, che
 }
 
 func Run(ctx context.Context) error {
+	interruptDebug("graph run-start project_id=%s checkpoint_id=%s", debugProjectID(ctx), graphCheckpointID(ctx))
 	r, err := Buildaicode(ctx)
 	if err != nil {
+		interruptDebug("graph build-error project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 		return err
 	}
 	opts := make([]compose.Option, 0, 2)
@@ -51,19 +53,24 @@ func Run(ctx context.Context) error {
 		opts = append(opts, compose.WithCheckPointID(graphCheckpointID(ctx)), compose.WithForceNewRun())
 	}
 	_, err = r.Invoke(ctx, map[string]any{}, opts...)
+	interruptDebug("graph invoke-return project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 	return handleGraphResult(ctx, err)
 }
 
 func Resume(ctx context.Context) error {
+	interruptDebug("graph resume-start project_id=%s", debugProjectID(ctx))
 	state, err := loadInterruptedGraphState(ctx)
 	if err != nil {
+		interruptDebug("graph resume-load-state-error project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 		return err
 	}
+	interruptDebug("graph resume-state project_id=%s status=%s checkpoint_id=%s pending=%d", debugProjectID(ctx), state.Status, state.CheckpointID, len(state.PendingInterrupts))
 	if len(state.PendingInterrupts) == 0 || state.PendingInterrupts[0].ID == "" {
 		return ErrNoInterruptedCheckpoint
 	}
 	answer, err := loadResumeAnswer(ctx, state, state.PendingInterrupts[0].ID)
 	if err != nil {
+		interruptDebug("graph resume-load-answer-error project_id=%s target_id=%s err=%T:%v", debugProjectID(ctx), state.PendingInterrupts[0].ID, err, err)
 		return err
 	}
 	if buffer, ok := utils.StringBufferFromContext(ctx); ok {
@@ -75,7 +82,9 @@ func Resume(ctx context.Context) error {
 		return err
 	}
 	resumeCtx := compose.ResumeWithData(ctx, state.PendingInterrupts[0].ID, answer)
+	interruptDebug("graph resume-invoke project_id=%s target_id=%s checkpoint_id=%s", debugProjectID(ctx), state.PendingInterrupts[0].ID, state.CheckpointID)
 	_, err = r.Invoke(resumeCtx, map[string]any{}, compose.WithCheckPointID(state.CheckpointID))
+	interruptDebug("graph resume-invoke-return project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 	return handleGraphResult(ctx, err)
 }
 
@@ -133,16 +142,22 @@ func resumeTargetIDs(state aievent.ProjectState, targetID string) map[string]boo
 
 func handleGraphResult(ctx context.Context, err error) error {
 	if err == nil {
+		interruptDebug("graph result-ok project_id=%s clear_checkpoint=%s", debugProjectID(ctx), graphCheckpointID(ctx))
 		_ = clearGraphCheckpoint(ctx)
 		return nil
 	}
+	interruptDebug("graph result-error project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 	info, ok := compose.ExtractInterruptInfo(err)
 	if !ok {
+		interruptDebug("graph extract-interrupt-miss project_id=%s", debugProjectID(ctx))
 		return err
 	}
+	interruptDebug("graph extract-interrupt-hit project_id=%s contexts=%d rerun=%d before=%d after=%d", debugProjectID(ctx), len(info.InterruptContexts), len(info.RerunNodes), len(info.BeforeNodes), len(info.AfterNodes))
 	if persistErr := persistGraphInterrupted(ctx, info); persistErr != nil {
+		interruptDebug("graph persist-error project_id=%s err=%T:%v", debugProjectID(ctx), persistErr, persistErr)
 		return persistErr
 	}
+	interruptDebug("graph persist-ok project_id=%s", debugProjectID(ctx))
 	return ErrInterrupted
 }
 
@@ -156,8 +171,10 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 		return fmt.Errorf("graph checkpoint requires project id")
 	}
 
+	interruptDebug("graph persist-start project_id=%s checkpoint_id=%s contexts=%d", projectID, graphCheckpointID(ctx), len(info.InterruptContexts))
 	interrupts := make([]aievent.PendingInterrupt, 0, len(info.InterruptContexts))
 	for _, interruptCtx := range info.InterruptContexts {
+		interruptDebug("graph persist-context project_id=%s interrupt_id=%s address=%s root=%v info_type=%T", projectID, interruptCtx.ID, interruptCtx.Address.String(), interruptCtx.IsRootCause, interruptCtx.Info)
 		payload := map[string]any{
 			"address":           interruptCtx.Address.String(),
 			aievent.PayloadInfo: interruptCtx.Info,
@@ -181,6 +198,7 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 		})
 	}
 	if len(interrupts) == 0 {
+		interruptDebug("graph persist-no-interrupts project_id=%s", projectID)
 		return ErrNoInterruptedCheckpoint
 	}
 
@@ -188,6 +206,7 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 	if b, ok := utils.StringBufferFromContext(ctx); ok {
 		buffer = b.String()
 	}
+	interruptDebug("graph persist-state-set project_id=%s checkpoint_id=%s pending=%d last_event_id=%s", projectID, graphCheckpointID(ctx), len(interrupts), lastEventID(ctx))
 	return stateStore.Set(ctx, aievent.RunningStateKey(projectID), aievent.ProjectState{
 		Status:            aievent.ProjectStatusInterrupted,
 		LastEventID:       lastEventID(ctx),
@@ -278,4 +297,13 @@ func lastEventID(ctx context.Context) string {
 		return ""
 	}
 	return state.LastEventID
+}
+
+func debugProjectID(ctx context.Context) string {
+	projectID, _ := utils.ProjectIDFromContext(ctx)
+	return projectID
+}
+
+func interruptDebug(format string, args ...any) {
+	fmt.Printf("AI_INTERRUPT_DEBUG "+format+"\n", args...)
 }

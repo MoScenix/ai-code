@@ -173,30 +173,39 @@ func (s *designerSession) close() {
 
 func (s *designerSession) run(initialMessages []*schema.Message, resumeParams *adk.ResumeParams) (map[string]any, error) {
 	for {
+		interruptDebug("designer run-turn-start project_id=%s has_initial=%v has_resume=%v checkpoint_id=%s", s.projectID, initialMessages != nil, resumeParams != nil, s.checkpointID)
 		interrupt, cleanup, err := s.runTurn(initialMessages, resumeParams)
 		initialMessages = nil
 		resumeParams = nil
 		if err != nil {
+			interruptDebug("designer run-turn-error project_id=%s err=%T:%v", s.projectID, err, err)
 			cleanup()
 			return nil, err
 		}
 		if interrupt == nil {
+			interruptDebug("designer run-turn-no-interrupt project_id=%s", s.projectID)
 			cleanup()
 			break
 		}
 
+		interruptDebug("designer wait-answer-start project_id=%s interrupt_id=%s event_id=%s checkpoint_id=%s", s.projectID, interrupt.ID, interrupt.EventID, s.checkpointID)
 		answer, ok, err := waitAnswer(s.ctx, s.answers, interrupt.ID)
 		cleanup()
 		if err != nil {
+			interruptDebug("designer wait-answer-error project_id=%s interrupt_id=%s err=%T:%v", s.projectID, interrupt.ID, err, err)
 			return nil, err
 		}
 		if !ok {
+			interruptDebug("designer wait-answer-timeout project_id=%s interrupt_id=%s checkpoint_id=%s last_event_id=%s", s.projectID, interrupt.ID, s.checkpointID, s.lastEventID)
 			interrupted, err := buildInterruptedState(s.ctx, s.checkpoints, s.checkpointID, s.lastEventID, interrupt, s.buffer)
 			if err != nil {
+				interruptDebug("designer build-interrupted-state-error project_id=%s interrupt_id=%s err=%T:%v", s.projectID, interrupt.ID, err, err)
 				return nil, err
 			}
+			interruptDebug("designer stateful-interrupt project_id=%s interrupt_id=%s checkpoint_id=%s checkpoint_bytes=%d pending=%d payload_keys=%v", s.projectID, interrupt.ID, interrupted.CheckpointID, len(interrupted.Checkpoint), len(interrupted.PendingInterrupts), mapKeys(interrupt.Payload))
 			return nil, compose.StatefulInterrupt(s.ctx, graphInterruptInfo(interrupted), interrupted)
 		}
+		interruptDebug("designer wait-answer-received project_id=%s interrupt_id=%s", s.projectID, interrupt.ID)
 
 		_ = setProjectState(s.ctx, s.stateStore, s.projectID, aievent.ProjectState{
 			Status:       aievent.ProjectStatusRunning,
@@ -406,4 +415,16 @@ func graphInterruptInfo(interrupted InterruptedState) any {
 		aievent.PayloadControlCursor:  interrupted.ControlCursor,
 		"designer_has_state":          len(interrupted.Checkpoint) > 0,
 	}
+}
+
+func interruptDebug(format string, args ...any) {
+	fmt.Printf("AI_INTERRUPT_DEBUG "+format+"\n", args...)
+}
+
+func mapKeys(m map[string]any) []string {
+	keys := make([]string, 0, len(m))
+	for key := range m {
+		keys = append(keys, key)
+	}
+	return keys
 }

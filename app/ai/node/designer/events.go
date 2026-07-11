@@ -188,10 +188,7 @@ type interruptEvent struct {
 
 func newInterruptEvent(agentName string, info *adk.InterruptInfo) *interruptEvent {
 	userInfo := interruptUserInfo(info)
-	payload := map[string]any{
-		"interrupt_contexts": info.InterruptContexts,
-		"data":               info.Data,
-	}
+	payload := map[string]any{}
 	id := rootInterruptID(info)
 	content := fmt.Sprint(userInfo)
 	if input, ok := userInfo.(agent.AskUserInput); ok {

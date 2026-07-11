@@ -48,7 +48,7 @@ func Run(ctx context.Context, input map[string]any) (map[string]any, error) {
 	loopCtx, cancelLoop := context.WithCancel(ctx)
 	defer cancelLoop()
 
-	loop := adk.NewTurnLoop[[]*schema.Message, *schema.Message](adk.TurnLoopConfig[[]*schema.Message, *schema.Message]{
+	loop := adk.NewTurnLoop(adk.TurnLoopConfig[[]*schema.Message, *schema.Message]{
 		GenInput: genInput,
 		PrepareAgent: func(context.Context, *adk.TurnLoop[[]*schema.Message, *schema.Message], [][]*schema.Message) (adk.TypedAgent[*schema.Message], error) {
 			return coderAgent, nil
