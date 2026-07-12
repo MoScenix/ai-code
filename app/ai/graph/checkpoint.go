@@ -42,10 +42,8 @@ func (s *graphCheckpointStore) Set(ctx context.Context, checkpointID string, che
 }
 
 func Run(ctx context.Context) error {
-	interruptDebug("graph run-start project_id=%s checkpoint_id=%s", debugProjectID(ctx), graphCheckpointID(ctx))
 	r, err := Buildaicode(ctx)
 	if err != nil {
-		interruptDebug("graph build-error project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 		return err
 	}
 	opts := make([]compose.Option, 0, 2)
@@ -53,24 +51,19 @@ func Run(ctx context.Context) error {
 		opts = append(opts, compose.WithCheckPointID(graphCheckpointID(ctx)), compose.WithForceNewRun())
 	}
 	_, err = r.Invoke(ctx, map[string]any{}, opts...)
-	interruptDebug("graph invoke-return project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 	return handleGraphResult(ctx, err)
 }
 
 func Resume(ctx context.Context) error {
-	interruptDebug("graph resume-start project_id=%s", debugProjectID(ctx))
 	state, err := loadInterruptedGraphState(ctx)
 	if err != nil {
-		interruptDebug("graph resume-load-state-error project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 		return err
 	}
-	interruptDebug("graph resume-state project_id=%s status=%s checkpoint_id=%s pending=%d", debugProjectID(ctx), state.Status, state.CheckpointID, len(state.PendingInterrupts))
-	if len(state.PendingInterrupts) == 0 || state.PendingInterrupts[0].ID == "" {
+	if len(state.PendingInterrupts) == 0 {
 		return ErrNoInterruptedCheckpoint
 	}
-	answer, err := loadResumeAnswer(ctx, state, state.PendingInterrupts[0].ID)
+	resumeID, answer, err := loadResumeAnswer(ctx, state)
 	if err != nil {
-		interruptDebug("graph resume-load-answer-error project_id=%s target_id=%s err=%T:%v", debugProjectID(ctx), state.PendingInterrupts[0].ID, err, err)
 		return err
 	}
 	if buffer, ok := utils.StringBufferFromContext(ctx); ok {
@@ -81,21 +74,19 @@ func Resume(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	resumeCtx := compose.ResumeWithData(ctx, state.PendingInterrupts[0].ID, answer)
-	interruptDebug("graph resume-invoke project_id=%s target_id=%s checkpoint_id=%s", debugProjectID(ctx), state.PendingInterrupts[0].ID, state.CheckpointID)
+	resumeCtx := compose.ResumeWithData(ctx, resumeID, answer)
 	_, err = r.Invoke(resumeCtx, map[string]any{}, compose.WithCheckPointID(state.CheckpointID))
-	interruptDebug("graph resume-invoke-return project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 	return handleGraphResult(ctx, err)
 }
 
-func loadResumeAnswer(ctx context.Context, state aievent.ProjectState, targetID string) (agent.DesignerAnswer, error) {
+func loadResumeAnswer(ctx context.Context, state aievent.ProjectState) (string, agent.DesignerAnswer, error) {
 	streamStore, ok := utils.StreamStoreFromContext(ctx)
 	if !ok || streamStore == nil {
-		return agent.DesignerAnswer{}, fmt.Errorf("graph resume requires stream store")
+		return "", agent.DesignerAnswer{}, fmt.Errorf("graph resume requires stream store")
 	}
 	projectID, ok := utils.ProjectIDFromContext(ctx)
 	if !ok || projectID == "" {
-		return agent.DesignerAnswer{}, fmt.Errorf("graph resume requires project id")
+		return "", agent.DesignerAnswer{}, fmt.Errorf("graph resume requires project id")
 	}
 	lastID := resumeEventCursor(state)
 	if strings.TrimSpace(lastID) == "" {
@@ -107,57 +98,59 @@ func loadResumeAnswer(ctx context.Context, state aievent.ProjectState, targetID 
 		Count: 32,
 	})
 	if err != nil {
-		return agent.DesignerAnswer{}, err
+		return "", agent.DesignerAnswer{}, err
 	}
-	targetIDs := resumeTargetIDs(state, targetID)
 	for _, msg := range messages {
 		event, err := redisstream.Decode[aievent.TaskEvent](msg)
 		if err != nil || event.Type != aievent.EventAnswer {
 			continue
 		}
-		if len(targetIDs) > 0 && !targetIDs[strings.TrimSpace(event.TargetID)] {
+		resumeID, answerTargetID, ok := resumeTargetForAnswer(state, event.TargetID)
+		if !ok {
 			continue
 		}
-		return agent.DesignerAnswer{
-			Content: event.Content,
-			Payload: event.Payload,
+		return resumeID, agent.DesignerAnswer{
+			TargetID: answerTargetID,
+			Content:  event.Content,
+			Payload:  event.Payload,
 		}, nil
 	}
-	return agent.DesignerAnswer{}, ErrResumeAnswerNotFound
+	return "", agent.DesignerAnswer{}, ErrResumeAnswerNotFound
 }
 
-func resumeTargetIDs(state aievent.ProjectState, targetID string) map[string]bool {
-	ids := make(map[string]bool)
-	if targetID = strings.TrimSpace(targetID); targetID != "" {
-		ids[targetID] = true
+func resumeTargetForAnswer(state aievent.ProjectState, targetID string) (resumeID string, answerTargetID string, ok bool) {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return "", "", false
 	}
-	if len(state.PendingInterrupts) == 0 {
-		return ids
+	for _, interrupt := range state.PendingInterrupts {
+		if !aievent.PendingInterruptMatches(interrupt, targetID) {
+			continue
+		}
+		answerTargetID = aievent.ADKInterruptID(interrupt.Payload)
+		if answerTargetID == "" {
+			answerTargetID = aievent.ADKInterruptID(aievent.NestedPayload(interrupt.Payload, aievent.PayloadInfo))
+		}
+		if answerTargetID == "" {
+			answerTargetID = targetID
+		}
+		return interrupt.ID, answerTargetID, interrupt.ID != ""
 	}
-	for id := range aievent.PendingInterruptTargetIDs(state.PendingInterrupts[0]) {
-		ids[id] = true
-	}
-	return ids
+	return "", "", false
 }
 
 func handleGraphResult(ctx context.Context, err error) error {
 	if err == nil {
-		interruptDebug("graph result-ok project_id=%s clear_checkpoint=%s", debugProjectID(ctx), graphCheckpointID(ctx))
 		_ = clearGraphCheckpoint(ctx)
 		return nil
 	}
-	interruptDebug("graph result-error project_id=%s err=%T:%v", debugProjectID(ctx), err, err)
 	info, ok := compose.ExtractInterruptInfo(err)
 	if !ok {
-		interruptDebug("graph extract-interrupt-miss project_id=%s", debugProjectID(ctx))
 		return err
 	}
-	interruptDebug("graph extract-interrupt-hit project_id=%s contexts=%d rerun=%d before=%d after=%d", debugProjectID(ctx), len(info.InterruptContexts), len(info.RerunNodes), len(info.BeforeNodes), len(info.AfterNodes))
 	if persistErr := persistGraphInterrupted(ctx, info); persistErr != nil {
-		interruptDebug("graph persist-error project_id=%s err=%T:%v", debugProjectID(ctx), persistErr, persistErr)
 		return persistErr
 	}
-	interruptDebug("graph persist-ok project_id=%s", debugProjectID(ctx))
 	return ErrInterrupted
 }
 
@@ -171,10 +164,8 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 		return fmt.Errorf("graph checkpoint requires project id")
 	}
 
-	interruptDebug("graph persist-start project_id=%s checkpoint_id=%s contexts=%d", projectID, graphCheckpointID(ctx), len(info.InterruptContexts))
 	interrupts := make([]aievent.PendingInterrupt, 0, len(info.InterruptContexts))
 	for _, interruptCtx := range info.InterruptContexts {
-		interruptDebug("graph persist-context project_id=%s interrupt_id=%s address=%s root=%v info_type=%T", projectID, interruptCtx.ID, interruptCtx.Address.String(), interruptCtx.IsRootCause, interruptCtx.Info)
 		payload := map[string]any{
 			"address":           interruptCtx.Address.String(),
 			aievent.PayloadInfo: interruptCtx.Info,
@@ -198,7 +189,6 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 		})
 	}
 	if len(interrupts) == 0 {
-		interruptDebug("graph persist-no-interrupts project_id=%s", projectID)
 		return ErrNoInterruptedCheckpoint
 	}
 
@@ -206,7 +196,6 @@ func persistGraphInterrupted(ctx context.Context, info *compose.InterruptInfo) e
 	if b, ok := utils.StringBufferFromContext(ctx); ok {
 		buffer = b.String()
 	}
-	interruptDebug("graph persist-state-set project_id=%s checkpoint_id=%s pending=%d last_event_id=%s", projectID, graphCheckpointID(ctx), len(interrupts), lastEventID(ctx))
 	return stateStore.Set(ctx, aievent.RunningStateKey(projectID), aievent.ProjectState{
 		Status:            aievent.ProjectStatusInterrupted,
 		LastEventID:       lastEventID(ctx),
@@ -297,13 +286,4 @@ func lastEventID(ctx context.Context) string {
 		return ""
 	}
 	return state.LastEventID
-}
-
-func debugProjectID(ctx context.Context) string {
-	projectID, _ := utils.ProjectIDFromContext(ctx)
-	return projectID
-}
-
-func interruptDebug(format string, args ...any) {
-	fmt.Printf("AI_INTERRUPT_DEBUG "+format+"\n", args...)
 }

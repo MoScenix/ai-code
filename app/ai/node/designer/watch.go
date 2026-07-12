@@ -77,10 +77,26 @@ func markAnswerAccepted(ctx context.Context, projectID string, targetID string, 
 		return nil
 	}
 
-	state.Status = aievent.ProjectStatusRunning
-	state.PendingInterrupts = nil
+	state.PendingInterrupts = remainingInterrupts(state.PendingInterrupts, targetID)
+	if len(state.PendingInterrupts) == 0 {
+		state.Status = aievent.ProjectStatusRunning
+	}
 	state.UpdatedAt = time.Now().UnixMilli()
 	return stateStore.Set(ctx, aievent.RunningStateKey(projectID), state)
+}
+
+func remainingInterrupts(interrupts []aievent.PendingInterrupt, targetID string) []aievent.PendingInterrupt {
+	targetID = strings.TrimSpace(targetID)
+	if targetID == "" {
+		return interrupts
+	}
+	out := make([]aievent.PendingInterrupt, 0, len(interrupts))
+	for _, interrupt := range interrupts {
+		if !aievent.PendingInterruptMatches(interrupt, targetID) {
+			out = append(out, interrupt)
+		}
+	}
+	return out
 }
 
 func controlCursor(ctx context.Context, projectID string) string {

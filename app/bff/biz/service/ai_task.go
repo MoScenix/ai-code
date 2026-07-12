@@ -72,6 +72,9 @@ func answerAIQuestion(ctx context.Context, appID int64, content string, targetID
 	if targetID == "" {
 		return false, fmt.Errorf("pending interrupt target not found")
 	}
+	if len(state.PendingInterrupts) > 0 && !hasPendingInterrupt(state, targetID) {
+		return false, fmt.Errorf("pending interrupt target not found")
+	}
 
 	eventID, err := addTaskEvent(ctx, appID, aievent.TaskEvent{
 		ProjectID: projectID(appID),

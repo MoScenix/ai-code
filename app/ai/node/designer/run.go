@@ -27,6 +27,7 @@ type InterruptedState struct {
 	Checkpoint        []byte
 	PendingInterrupts []aievent.PendingInterrupt
 	Buffer            string
+	Design            string
 	LastEventID       string
 	ControlCursor     string
 }
@@ -122,6 +123,12 @@ func runResumed(ctx context.Context, interrupted InterruptedState, answer agent.
 		return nil, err
 	}
 	defer session.close()
+	session.design.WriteString(interrupted.Design)
+
+	targets, err := resumeTargets(interrupted.PendingInterrupts, answer)
+	if err != nil {
+		return nil, err
+	}
 
 	session.lastEventID, _ = publishTaskEvent(ctx, session.streamStore, aievent.TaskEvent{
 		ProjectID: session.projectID,
@@ -140,7 +147,7 @@ func runResumed(ctx context.Context, interrupted InterruptedState, answer agent.
 		UpdatedAt:    time.Now().UnixMilli(),
 	})
 	return session.run(nil, &adk.ResumeParams{
-		Targets: resumeTargets(interrupted.PendingInterrupts, answer),
+		Targets: targets,
 	})
 }
 
@@ -173,39 +180,30 @@ func (s *designerSession) close() {
 
 func (s *designerSession) run(initialMessages []*schema.Message, resumeParams *adk.ResumeParams) (map[string]any, error) {
 	for {
-		interruptDebug("designer run-turn-start project_id=%s has_initial=%v has_resume=%v checkpoint_id=%s", s.projectID, initialMessages != nil, resumeParams != nil, s.checkpointID)
 		interrupt, cleanup, err := s.runTurn(initialMessages, resumeParams)
 		initialMessages = nil
 		resumeParams = nil
 		if err != nil {
-			interruptDebug("designer run-turn-error project_id=%s err=%T:%v", s.projectID, err, err)
 			cleanup()
 			return nil, err
 		}
 		if interrupt == nil {
-			interruptDebug("designer run-turn-no-interrupt project_id=%s", s.projectID)
 			cleanup()
 			break
 		}
 
-		interruptDebug("designer wait-answer-start project_id=%s interrupt_id=%s event_id=%s checkpoint_id=%s", s.projectID, interrupt.ID, interrupt.EventID, s.checkpointID)
 		answer, ok, err := waitAnswer(s.ctx, s.answers, interrupt.ID)
 		cleanup()
 		if err != nil {
-			interruptDebug("designer wait-answer-error project_id=%s interrupt_id=%s err=%T:%v", s.projectID, interrupt.ID, err, err)
 			return nil, err
 		}
 		if !ok {
-			interruptDebug("designer wait-answer-timeout project_id=%s interrupt_id=%s checkpoint_id=%s last_event_id=%s", s.projectID, interrupt.ID, s.checkpointID, s.lastEventID)
-			interrupted, err := buildInterruptedState(s.ctx, s.checkpoints, s.checkpointID, s.lastEventID, interrupt, s.buffer)
+			interrupted, err := buildInterruptedState(s, interrupt)
 			if err != nil {
-				interruptDebug("designer build-interrupted-state-error project_id=%s interrupt_id=%s err=%T:%v", s.projectID, interrupt.ID, err, err)
 				return nil, err
 			}
-			interruptDebug("designer stateful-interrupt project_id=%s interrupt_id=%s checkpoint_id=%s checkpoint_bytes=%d pending=%d payload_keys=%v", s.projectID, interrupt.ID, interrupted.CheckpointID, len(interrupted.Checkpoint), len(interrupted.PendingInterrupts), mapKeys(interrupt.Payload))
 			return nil, compose.StatefulInterrupt(s.ctx, graphInterruptInfo(interrupted), interrupted)
 		}
-		interruptDebug("designer wait-answer-received project_id=%s interrupt_id=%s", s.projectID, interrupt.ID)
 
 		_ = setProjectState(s.ctx, s.stateStore, s.projectID, aievent.ProjectState{
 			Status:       aievent.ProjectStatusRunning,
@@ -333,19 +331,20 @@ func stringBuffer(ctx context.Context) *utils.StringBuffer {
 	return buffer
 }
 
-func buildInterruptedState(ctx context.Context, checkpoints *memoryCheckpointStore, checkpointID string, lastEventID string, interrupt *interruptEvent, buffer *utils.StringBuffer) (InterruptedState, error) {
-	data, existed, err := checkpoints.Get(ctx, checkpointID)
+func buildInterruptedState(s *designerSession, interrupt *interruptEvent) (InterruptedState, error) {
+	data, existed, err := s.checkpoints.Get(s.ctx, s.checkpointID)
 	if err != nil {
 		return InterruptedState{}, err
 	}
 	if !existed {
-		return InterruptedState{}, fmt.Errorf("designer checkpoint %q not found", checkpointID)
+		return InterruptedState{}, fmt.Errorf("designer checkpoint %q not found", s.checkpointID)
 	}
 	return InterruptedState{
-		CheckpointID:  checkpointID,
+		CheckpointID:  s.checkpointID,
 		Checkpoint:    data,
-		LastEventID:   lastEventID,
-		ControlCursor: utils.ControlCursor(ctx),
+		Design:        s.design.String(),
+		LastEventID:   s.lastEventID,
+		ControlCursor: utils.ControlCursor(s.ctx),
 		PendingInterrupts: []aievent.PendingInterrupt{
 			{
 				ID:      interrupt.ID,
@@ -354,7 +353,7 @@ func buildInterruptedState(ctx context.Context, checkpoints *memoryCheckpointSto
 				Payload: interrupt.Payload,
 			},
 		},
-		Buffer: bufferValue(buffer),
+		Buffer: bufferValue(s.buffer),
 	}, nil
 }
 
@@ -375,7 +374,7 @@ func historyMessages(ctx context.Context) []*schema.Message {
 	}
 	if buffer, ok := utils.StringBufferFromContext(ctx); ok {
 		if extra := strings.TrimSpace(buffer.String()); extra != "" {
-			messages = append(messages, schema.SystemMessage("Pending designer input:\n"+extra))
+			messages = append(messages, schema.UserMessage("Pending designer input:\n"+extra))
 		}
 	}
 	return messages
@@ -388,14 +387,25 @@ func bufferValue(buffer *utils.StringBuffer) string {
 	return buffer.String()
 }
 
-func resumeTargets(interrupts []aievent.PendingInterrupt, answer agent.DesignerAnswer) map[string]any {
-	targets := make(map[string]any, len(interrupts))
-	for _, interrupt := range interrupts {
-		if interrupt.ID != "" {
-			targets[interrupt.ID] = answer
-		}
+func resumeTargets(interrupts []aievent.PendingInterrupt, answer agent.DesignerAnswer) (map[string]any, error) {
+	if len(interrupts) == 0 {
+		return nil, fmt.Errorf("designer has no pending interrupts")
 	}
-	return targets
+	targetID := strings.TrimSpace(answer.TargetID)
+	if targetID == "" && len(interrupts) == 1 {
+		targetID = strings.TrimSpace(interrupts[0].ID)
+	}
+	for _, interrupt := range interrupts {
+		if !aievent.PendingInterruptMatches(interrupt, targetID) {
+			continue
+		}
+		if interrupt.ID == "" {
+			return nil, fmt.Errorf("designer interrupt ID is empty")
+		}
+		answer.TargetID = targetID
+		return map[string]any{interrupt.ID: answer}, nil
+	}
+	return nil, fmt.Errorf("designer resume target %q not found", targetID)
 }
 
 func graphInterruptInfo(interrupted InterruptedState) any {
@@ -415,16 +425,4 @@ func graphInterruptInfo(interrupted InterruptedState) any {
 		aievent.PayloadControlCursor:  interrupted.ControlCursor,
 		"designer_has_state":          len(interrupted.Checkpoint) > 0,
 	}
-}
-
-func interruptDebug(format string, args ...any) {
-	fmt.Printf("AI_INTERRUPT_DEBUG "+format+"\n", args...)
-}
-
-func mapKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for key := range m {
-		keys = append(keys, key)
-	}
-	return keys
 }

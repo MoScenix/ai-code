@@ -39,7 +39,8 @@ func waitAnswer(ctx context.Context, answers <-chan answerEvent, targetID string
 
 func agentAnswer(event aievent.TaskEvent) agent.DesignerAnswer {
 	return agent.DesignerAnswer{
-		Content: event.Content,
-		Payload: event.Payload,
+		TargetID: event.TargetID,
+		Content:  event.Content,
+		Payload:  event.Payload,
 	}
 }

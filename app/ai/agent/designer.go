@@ -33,8 +33,9 @@ type DesignerInterruptState struct {
 }
 
 type DesignerAnswer struct {
-	Content string         `json:"content,omitempty"`
-	Payload map[string]any `json:"payload,omitempty"`
+	TargetID string         `json:"target_id,omitempty"`
+	Content  string         `json:"content,omitempty"`
+	Payload  map[string]any `json:"payload,omitempty"`
 }
 
 func init() {

@@ -412,6 +412,10 @@ export function useAIEvents(appId: Ref<any>) {
     if (res.data.code !== 0) return false
     await refreshState()
     if (!aiState.value?.exists) return true
+    if ((aiState.value.status === 'waiting_answer' || aiState.value.status === 'interrupted') && currentQuestion.value) {
+      isGenerating.value = false
+      return true
+    }
     isGenerating.value = true
     setLocalState('running')
     ensureAIMessage()
